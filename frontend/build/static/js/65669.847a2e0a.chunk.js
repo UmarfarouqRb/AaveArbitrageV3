@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkfrontend=self.webpackChunkfrontend||[]).push([[65669],{65669:(e,n,t)=>{t.r(n),t.d(n,{default:()=>a});const a={connecting:"Conectando \xe0 Conta Inteligente",failedToConnect:"Falha ao conectar \xe0 Conta Inteligente",wrongNetworkScreen:{failedToSwitch:"Falha ao mudar de rede",subtitle:"Sua carteira n\xe3o est\xe1 conectada \xe0 rede requerida",title:"Rede Incorreta"}}}}]);
+//# sourceMappingURL=65669.847a2e0a.chunk.js.map

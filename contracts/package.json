@@ -1,4 +1,3 @@
-netlify deploy --prod
 {
   "name": "contracts",
   "version": "0.1.0",
@@ -9,10 +8,14 @@ netlify deploy --prod
     "node": "npx hardhat node"
   },
   "devDependencies": {
-    "hardhat": "^2.18.0",
-    "@nomicfoundation/hardhat-toolbox": "^3.0.0",
-    "ethers": "^6.13.0",
-    "@openzeppelin/contracts": "^4.9.3",
-    "dotenv": "^16.0.0"
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.4.0",
+    "@types/node": "^20.0.0",
+    "dotenv": "^16.6.1",
+    "hardhat": "^2.22.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

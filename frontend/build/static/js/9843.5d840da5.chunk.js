@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkfrontend=self.webpackChunkfrontend||[]).push([[9843],{9843:(e,n,t)=>{t.r(n),t.d(n,{default:()=>c});const c={connecting:"\u6b63\u5728\u8fde\u63a5\u667a\u80fd\u8d26\u6237",failedToConnect:"\u8fde\u63a5\u667a\u80fd\u8d26\u6237\u5931\u8d25",wrongNetworkScreen:{failedToSwitch:"\u7f51\u7edc\u5207\u6362\u5931\u8d25",subtitle:"\u94b1\u5305\u672a\u8fde\u63a5\u81f3\u6240\u9700\u7f51\u7edc",title:"\u7f51\u7edc\u9519\u8bef"}}}}]);
+//# sourceMappingURL=9843.5d840da5.chunk.js.map

@@ -8,7 +8,7 @@ headers = []
 publish = "/home/user/Arbitrage/frontend/dist"
 publishOrigin = "config"
 commandOrigin = "config"
-command = "cd frontend && npm install && npm run build"
+command = "cd frontend && npm install --legacy-peer-deps && npm run build"
 functions = "/home/user/Arbitrage/netlify/functions"
 
 [build.environment]

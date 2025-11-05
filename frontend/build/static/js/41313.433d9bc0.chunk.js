@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkfrontend=self.webpackChunkfrontend||[]).push([[41313],{41313:(e,n,t)=>{t.r(n),t.d(n,{default:()=>c});const c={connecting:"Connexion au compte intelligent",failedToConnect:"\xc9chec de la connexion au compte intelligent",wrongNetworkScreen:{failedToSwitch:"\xc9chec du changement de r\xe9seau",subtitle:"Votre portefeuille n'est pas connect\xe9 au r\xe9seau requis",title:"Mauvais r\xe9seau"}}}}]);
+//# sourceMappingURL=41313.433d9bc0.chunk.js.map

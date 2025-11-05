@@ -10,7 +10,7 @@ describe('ArbitrageBalancer - forked integration test (simulate)', function(){
     const vaultAddr = deployer.address; // dummy
     const Arb = await ethers.getContractFactory('ArbitrageBalancer');
     const arb = await Arb.deploy(vaultAddr);
-    await arb.deployed();
+    await arb.waitForDeployment();
 
     // Prepare tokens: use WETH and DAI addresses on mainnet fork
     const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2';

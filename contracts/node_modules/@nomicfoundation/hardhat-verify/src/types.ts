@@ -10,6 +10,18 @@ export interface ChainConfig {
 export interface EtherscanConfig {
   apiKey: ApiKey;
   customChains: ChainConfig[];
+  enabled: boolean;
+}
+
+export interface SourcifyConfig {
+  enabled: boolean;
+  apiUrl?: string;
+  browserUrl?: string;
+}
+
+export interface BlockscoutConfig {
+  enabled: boolean;
+  customChains: ChainConfig[];
 }
 
 export type ApiKey = string | Record<string, string>;

@@ -1,15 +1,19 @@
+const networkConfig = {
+  'Base Mainnet': {
+    rpcUrl: 'https://mainnet.base.org',
+    chainId: 8453,
+  },
+  'Base Sepolia': {
+    rpcUrl: 'https://sepolia.base.org',
+    chainId: 84532,
+  },
+};
 
 exports.handler = async function(event, context) {
-  // Use public RPCs for Base networks
-  const getRpcUrl = (network) => {
-    if (network === 'Base Mainnet') return 'https://mainnet.base.org';
-    if (network === 'Base Sepolia') return 'https://sepolia.base.org';
-    return 'https://sepolia.base.org'; // Default fallback
-  };
-
   try {
     const { network, method, params, id } = JSON.parse(event.body);
-    const rpcUrl = getRpcUrl(network);
+    const config = networkConfig[network] || networkConfig['Base Sepolia']; // Fallback to Base Sepolia
+    const rpcUrl = config.rpcUrl;
 
     const proxyRequest = {
       method: 'POST',

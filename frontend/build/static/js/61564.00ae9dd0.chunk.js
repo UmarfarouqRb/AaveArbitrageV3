@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkfrontend=self.webpackChunkfrontend||[]).push([[61564],{61564:(e,t,r)=>{r.d(t,{resolveArweaveScheme:()=>n});const a="https://arweave.net/{fileId}";function n(e){if(e.uri.startsWith("ar://")){const t=e.uri.replace("ar://","");if(e.gatewayUrl){const r=e.gatewayUrl.endsWith("/")?"":"/";return"".concat(e.gatewayUrl).concat(r).concat(t)}return a.replace("{fileId}",t)}if(e.uri.startsWith("http"))return e.uri;throw new Error('Invalid URI scheme, expected "ar://" or "http(s)://"')}}}]);
+//# sourceMappingURL=61564.00ae9dd0.chunk.js.map

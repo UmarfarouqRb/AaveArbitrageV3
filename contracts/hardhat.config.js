@@ -1,15 +1,13 @@
+require('@nomicfoundation/hardhat-toolbox');
+require("dotenv").config();
 
-require('@nomicfoundation/hardhat-toolbox')
-require('dotenv').config()
-
+/** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  solidity: '0.8.20',
+  solidity: "0.8.20",
   networks: {
-    hardhat: {
-      forking: process.env.FORK_URL ? { url: process.env.FORK_URL } : undefined
+    sepolia: {
+      url: `https://sepolia.infura.io/v3/${process.env.INFURA_API_KEY}`,
+      accounts: [process.env.PRIVATE_KEY]
     }
-  },
-  etherscan: {
-    apiKey: process.env.ETHERSCAN_KEY || ''
   }
-}
+};

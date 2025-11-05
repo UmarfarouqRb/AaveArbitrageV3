@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkfrontend=self.webpackChunkfrontend||[]).push([[15246],{15246:(l,e,n)=>{n.d(e,{wallet:()=>a});const a={id:"io.up",name:"UP.io",homepage:"https://up.io",image_id:"f1a3f4d4-871f-42db-89ab-bb36b5c01f00",app:{browser:null,ios:null,android:"https://play.google.com/store/apps/details?id=io.up.wallet&hl=en",mac:null,windows:null,linux:null,chrome:null,firefox:null,safari:null,edge:null,opera:null},rdns:null,mobile:{native:"up-io://",universal:"https://up.io/app/"},desktop:{native:"",universal:""}}}}]);
+//# sourceMappingURL=15246.b1713172.chunk.js.map

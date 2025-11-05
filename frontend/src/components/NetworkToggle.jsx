@@ -1,13 +1,8 @@
 import React from 'react';
-
-const networks = ['Base Mainnet', 'Base Sepolia'];
-
-export default function NetworkToggle({ network, onNetworkChange }) {
+export default function NetworkToggle({ network, onToggle }) {
   return (
-    <select value={network} onChange={(e) => onNetworkChange(e.target.value)} className="network-toggle">
-      {networks.map(net => (
-        <option key={net} value={net}>{net}</option>
-      ))}
-    </select>
+    <button onClick={onToggle} style={{padding:8, background:'#0366d6', color:'#fff', borderRadius:6}}>
+      {network === 'sepolia' ? 'Switch to Mainnet' : 'Switch to Sepolia'}
+    </button>
   );
 }

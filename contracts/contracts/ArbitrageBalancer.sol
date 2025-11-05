@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./interfaces/IUniswapV2Router.sol";
 
 interface IVault {
     function flashLoan(
@@ -13,18 +14,7 @@ interface IVault {
     ) external;
 }
 
-interface IUniswapV2Router {
-    function swapExactTokensForTokens(
-        uint amountIn,
-        uint amountOutMin,
-        address[] calldata path,
-        address to,
-        uint deadline
-    ) external returns (uint[] memory amounts);
-}
-
 contract ArbitrageBalancer is ReentrancyGuard {
-    using SafeERC20 for IERC20;
     address public immutable owner;
     IVault public immutable vault;
 
@@ -45,7 +35,6 @@ contract ArbitrageBalancer is ReentrancyGuard {
         vault.flashLoan(address(this), tokens, amounts, userData);
     }
 
-    // This is the function called by the Vault contract
     function receiveFlashLoan(
         address[] calldata tokens,
         uint256[] calldata amounts,
@@ -56,15 +45,14 @@ contract ArbitrageBalancer is ReentrancyGuard {
         require(tokens.length == 1, "only single token flash loans");
 
         (
-            address router1,
-            address router2,
-            address token1,
-            address token2,
-            uint256 minAmountOut1,
-            uint256 deadline
-        ) = abi.decode(userData, (address, address, address, address, uint256, uint256));
-
-        require(block.timestamp <= deadline, "Deadline has passed");
+            address inputToken,
+            address middleToken,
+            address outputToken,
+            address[] memory routers,
+            address[][] memory paths,
+            uint256 minOutsSecondSwap,
+            uint256 minTwap
+        ) = abi.decode(userData, (address, address, address, address[], address[][], uint256, uint256));
 
         address loanToken = tokens[0];
         uint256 loanAmount = amounts[0];
@@ -72,51 +60,47 @@ contract ArbitrageBalancer is ReentrancyGuard {
         uint256 totalRepayment = loanAmount + fee;
 
         // 1. First Swap
-        IERC20(loanToken).safeApprove(router1, loanAmount);
-        address[] memory path1 = new address[](2);
-        path1[0] = token1;
-        path1[1] = token2;
-        uint[] memory amountsOut1 = IUniswapV2Router(router1).swapExactTokensForTokens(
+        IERC20(loanToken).approve(routers[0], loanAmount);
+        uint[] memory amountsOut1 = IUniswapV2Router(routers[0]).swapExactTokensForTokens(
             loanAmount,
-            minAmountOut1,
-            path1,
+            1, // Minimal amount out for the first swap
+            paths[0],
             address(this),
-            deadline
+            block.timestamp 
         );
 
         // 2. Second Swap
-        uint amountFromFirstSwap = amountsOut1[1];
-        IERC20(token2).safeApprove(router2, amountFromFirstSwap);
-        address[] memory path2 = new address[](2);
-        path2[0] = token2;
-        path2[1] = token1;
+        uint amountFromFirstSwap = amountsOut1[amountsOut1.length - 1];
+        IERC20(middleToken).approve(routers[1], amountFromFirstSwap);
         
-        // For the second swap, the minimum output must be enough to repay the loan + fee
-        uint[] memory amountsOut2 = IUniswapV2Router(router2).swapExactTokensForTokens(
+        uint[] memory amountsOut2 = IUniswapV2Router(routers[1]).swapExactTokensForTokens(
             amountFromFirstSwap,
             totalRepayment,
-            path2,
+            paths[1],
             address(this),
-            deadline
+            block.timestamp
         );
-        uint amountFromSecondSwap = amountsOut2[1];
+        uint amountFromSecondSwap = amountsOut2[amountsOut2.length - 1];
 
         // 3. Repay Flash Loan
         require(amountFromSecondSwap >= totalRepayment, "Not profitable");
 
-        IERC20(loanToken).safeTransfer(address(vault), totalRepayment);
+        IERC20(loanToken).transfer(address(vault), totalRepayment);
 
-        // 4. Calculate profit
-        int256 netProfit = int256(amountFromSecondSwap - totalRepayment);
+        // 4. Calculate and withdraw profit
+        uint256 profit = amountFromSecondSwap - totalRepayment;
+        if (profit > 0) {
+            IERC20(loanToken).transfer(owner, profit);
+        }
 
-        emit FlashLoanExecuted(loanToken, loanAmount, netProfit);
+        emit FlashLoanExecuted(loanToken, loanAmount, int256(profit));
     }
     
     function withdraw(address tokenAddress) external onlyOwner {
         IERC20 token = IERC20(tokenAddress);
         uint256 balance = token.balanceOf(address(this));
         if (balance > 0) {
-            token.safeTransfer(owner, balance);
+            token.transfer(owner, balance);
         }
     }
 }

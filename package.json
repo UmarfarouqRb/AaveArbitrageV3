@@ -9,5 +9,8 @@
     "@nomiclabs/hardhat-ethers": "^2.0.6",
     "ethers": "^6.0.0",
     "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=22.10.0"
   }
 }

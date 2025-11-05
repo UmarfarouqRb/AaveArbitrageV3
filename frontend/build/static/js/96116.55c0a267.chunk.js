@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkfrontend=self.webpackChunkfrontend||[]).push([[96116],{96116:(l,n,e)=>{e.d(n,{wallet:()=>u});const u={id:"io.useglyph",name:"Glyph Wallet",homepage:"https://useglyph.io/",image_id:"glyph.png",app:{browser:null,ios:null,android:null,mac:null,windows:null,linux:null,chrome:null,firefox:null,safari:null,edge:null,opera:null},rdns:"io.useglyph",mobile:{native:null,universal:null},desktop:{native:null,universal:null}}}}]);
+//# sourceMappingURL=96116.55c0a267.chunk.js.map

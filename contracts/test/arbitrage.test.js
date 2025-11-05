@@ -8,7 +8,7 @@ describe('ArbitrageBalancer (compile-only test)', function(){
     const vault = owner.address; // dummy
     const Arb = await ethers.getContractFactory('ArbitrageBalancer');
     const arb = await Arb.deploy(vault);
-    await arb.deployed();
+    await arb.waitForDeployment();
     expect(await arb.owner()).to.equal(owner.address);
   });
 });

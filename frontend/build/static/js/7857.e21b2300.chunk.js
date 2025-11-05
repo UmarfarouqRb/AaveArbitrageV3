@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkfrontend=self.webpackChunkfrontend||[]).push([[7857],{7857:(l,n,e)=>{e.d(n,{wallet:()=>u});const u={app:{android:null,browser:null,chrome:null,edge:null,firefox:null,ios:null,linux:null,mac:null,opera:null,safari:null,windows:null},desktop:{native:null,universal:null},homepage:"https://thirdweb.com",id:"embedded",mobile:{native:null,universal:null},name:"Social Login",rdns:null}}}]);
+//# sourceMappingURL=7857.e21b2300.chunk.js.map
