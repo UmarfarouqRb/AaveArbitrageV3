@@ -1,2 +1,0 @@
-"use strict";(self.webpackChunkfrontend=self.webpackChunkfrontend||[]).push([[15471],{15471:(l,n,e)=>{e.d(n,{wallet:()=>a});const a={id:"sh.frame",name:"Frame Wallet",homepage:"https://frame.sh/",image_id:"frame.png",app:{browser:null,ios:null,android:null,mac:null,windows:null,linux:null,chrome:null,firefox:null,safari:null,edge:null,opera:null},rdns:"sh.frame",mobile:{native:null,universal:null},desktop:{native:null,universal:null}}}}]);
-//# sourceMappingURL=15471.97ad4c34.chunk.js.map

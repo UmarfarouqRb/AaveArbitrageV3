@@ -1,2 +1,0 @@
-"use strict";(self.webpackChunkfrontend=self.webpackChunkfrontend||[]).push([[63055],{63055:(l,n,e)=>{e.d(n,{getEcosystemWalletInfo:()=>a});var u=e(38);async function a(l){const n=await(0,u.V)(l);return{app:{android:null,browser:null,chrome:null,edge:null,firefox:null,ios:null,linux:null,mac:null,opera:null,safari:null,windows:null},desktop:{native:null,universal:null},homepage:n.homepage||"",id:l,image_id:n.imageUrl||"",mobile:{native:null,universal:null},name:n.name,rdns:null}}}}]);
-//# sourceMappingURL=63055.55d03b36.chunk.js.map

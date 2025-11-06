@@ -1,2 +1,0 @@
-"use strict";(self.webpackChunkfrontend=self.webpackChunkfrontend||[]).push([[50456],{50456:(l,n,e)=>{e.d(n,{wallet:()=>a});const a={id:"com.walletconnect.com",name:"Sample",homepage:"https://walletconnect.com",image_id:"171f0822-acf5-4eba-4392-a2d16db90400",app:{browser:null,ios:null,android:null,mac:null,windows:null,linux:null,chrome:"https://cloud.walletconnect.com",firefox:null,safari:null,edge:null,opera:null},rdns:"com.walletconnect.com",mobile:{native:null,universal:null},desktop:{native:null,universal:null}}}}]);
-//# sourceMappingURL=50456.2dd8c23a.chunk.js.map
