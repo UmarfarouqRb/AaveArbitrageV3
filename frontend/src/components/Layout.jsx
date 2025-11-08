@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { NavLink } from 'react-router-dom';
 import { usePrivy } from '@privy-io/react-auth';
 import styled from 'styled-components';
+import { NetworkContext } from '../contexts/NetworkContext';
+import { networks } from '../utils/networks';
 
 const AppContainer = styled.div`
   display: flex;
@@ -70,9 +72,22 @@ const StyledNavLink = styled(NavLink)`
   }
 `;
 
+const NetworkSelector = styled.select`
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+    background-color: #fff;
+    margin-left: 20px;
+`;
+
 export default function Layout({ children }) {
   const { ready, authenticated, user, login, logout } = usePrivy();
+  const { selectedNetwork, setSelectedNetwork } = useContext(NetworkContext);
   const address = user?.wallet?.address;
+
+  const handleNetworkChange = (e) => {
+    setSelectedNetwork(e.target.value);
+  };
 
   return (
     <AppContainer>
@@ -88,14 +103,23 @@ export default function Layout({ children }) {
 
       <MainContent>
         <Header>
-          <div>
-            {address && <ConnectedAddress>Connected as: <strong>{address}</strong></ConnectedAddress>}
-          </div>
-          {ready && (authenticated ? (
-            <AuthButton onClick={logout}>Logout</AuthButton>
-          ) : (
-            <AuthButton onClick={login}>Login</AuthButton>
-          ))}
+            <div>
+                {address && <ConnectedAddress>Connected as: <strong>{address}</strong></ConnectedAddress>}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+                <NetworkSelector value={selectedNetwork} onChange={handleNetworkChange}>
+                    {Object.keys(networks).map(networkKey => (
+                        <option key={networkKey} value={networkKey}>
+                            {networks[networkKey].name}
+                        </option>
+                    ))}
+                </NetworkSelector>
+                {ready && (authenticated ? (
+                    <AuthButton onClick={logout} style={{ marginLeft: '20px' }}>Logout</AuthButton>
+                ) : (
+                    <AuthButton onClick={login} style={{ marginLeft: '20px' }}>Login</AuthButton>
+                ))}
+            </div>
         </Header>
         {children}
       </MainContent>

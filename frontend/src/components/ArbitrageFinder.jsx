@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { ethers } from 'ethers';
 import { usePrivy } from '@privy-io/react-auth';
-import { config } from '../utils/config';
+import { NetworkContext } from '../contexts/NetworkContext';
 import { arbitrageBalancerABI } from '../utils/abi';
 import styled, { css } from 'styled-components';
 
@@ -84,6 +84,7 @@ const MessageBoxSuccess = styled(MessageBox)`
 
 const ArbitrageFinder = () => {
   const { ready, authenticated, user, login } = usePrivy();
+  const { networkConfig } = useContext(NetworkContext);
   const [tokenA, setTokenA] = useState('');
   const [tokenB, setTokenB] = useState('');
   const [amount, setAmount] = useState('');
@@ -111,19 +112,16 @@ const ArbitrageFinder = () => {
     setTxHash('');
 
     try {
-      // Get an EIP-1193 provider from the user's wallet
       const provider = await user.wallet.getEthersProvider();
-      // Get the signer
       const signer = provider.getSigner();
 
-      const contract = new ethers.Contract(config.arbitrageBalancerAddress, arbitrageBalancerABI, signer);
+      const contract = new ethers.Contract(networkConfig.arbitrageBalancerAddress, arbitrageBalancerABI, signer);
       
-      const parsedAmount = ethers.parseUnits(amount, 18); // Assuming 18 decimals
+      const parsedAmount = ethers.utils.parseUnits(amount, 18);
 
-      // Construct userData
       const path = [tokenA, tokenB];
       const routers = [router1, router2];
-      const userData = ethers.AbiCoder.defaultAbiCoder().encode(
+      const userData = ethers.utils.defaultAbiCoder.encode(
         ['address[]', 'address[]'],
         [path, routers]
       );
