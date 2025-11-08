@@ -1,5 +1,5 @@
-import React, { useState, useContext } from 'react';
-import { ethers } from 'ethers';
+import { useState, useContext } from 'react';
+import { Contract, parseUnits, AbiCoder } from 'ethers';
 import { usePrivy } from '@privy-io/react-auth';
 import { NetworkContext } from '../contexts/NetworkContext';
 import { arbitrageBalancerABI } from '../utils/abi';
@@ -115,20 +115,20 @@ const ArbitrageFinder = () => {
       const provider = await user.wallet.getEthersProvider();
       const signer = provider.getSigner();
 
-      const contract = new ethers.Contract(networkConfig.arbitrageBalancerAddress, arbitrageBalancerABI, signer);
+      const contract = new Contract(networkConfig.arbitrageBalancerAddress, arbitrageBalancerABI, signer);
       
-      const parsedAmount = ethers.utils.parseUnits(amount, 18);
+      const parsedAmount = parseUnits(amount, 18);
 
       const path = [tokenA, tokenB];
       const routers = [router1, router2];
-      const userData = ethers.utils.defaultAbiCoder.encode(
+      const userData = AbiCoder.default.encode(
         ['address[]', 'address[]'],
         [path, routers]
       );
 
       setTradeStatus('Sending transaction...');
       
-      const tx = await contract.startFlashloan(tokenA, parsedAmount, userData);
+      const tx = await contract.arbitrage(tokenA, parsedAmount, userData);
       
       setTradeStatus('Transaction sent. Waiting for confirmation...');
       setTxHash(tx.hash);

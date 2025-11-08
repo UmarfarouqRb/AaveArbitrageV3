@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useRef } from 'react';
-import styled, { css } from 'styled-components';
+import { useEffect, useState, useRef } from 'react';
+import styled from 'styled-components';
 
 const ArbitrageOpportunities = () => {
   const [opportunities, setOpportunities] = useState([]);
@@ -87,22 +87,15 @@ const ArbitrageOpportunities = () => {
       observer.observe(containerRef.current);
     }
 
-    const handler = setTimeout(() => {
-      fetchAndRankOpportunities();
-    }, 500);
-
     return () => {
-        clearTimeout(handler);
         if(containerRef.current) {
             observer.unobserve(containerRef.current);
         }
     };
-  }, [tokenAddress]);
+  }, []);
 
   const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text).then(() => {
-      alert('Contract address copied to clipboard!');
-    }).catch(err => {
+    navigator.clipboard.writeText(text).catch(err => {
       console.error('Could not copy text: ', err);
     });
   };
@@ -119,6 +112,7 @@ const ArbitrageOpportunities = () => {
           value={tokenAddress}
           onChange={(e) => setTokenAddress(e.target.value)}
         />
+        <SearchButton onClick={fetchAndRankOpportunities}>Search</SearchButton>
       </SearchContainer>
       {loading ? (
         <p style={{textAlign: 'center'}}>Finding the best opportunities...</p>
@@ -174,8 +168,18 @@ const TokenInput = styled.input`
   flex: 1;
   padding: 10px;
   font-size: 16px;
-  border-radius: 4px;
+  border-radius: 4px 0 0 4px;
   border: 1px solid #ccc;
+`;
+
+const SearchButton = styled.button`
+  padding: 10px 15px;
+  font-size: 16px;
+  border: 1px solid #007bff;
+  background-color: #007bff;
+  color: white;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
 `;
 
 const Grid = styled.div`

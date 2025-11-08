@@ -20,7 +20,7 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       // You can render any custom fallback UI
       return (
-        <div style={{ padding: '20px', backgroundColor: '#ffdede', borderRadius: '8px', color: 'red' }}>
+        <div style={{ padding: '40px', backgroundColor: '#ffdede', borderRadius: '8px', color: 'red' }}>
           <h2>Something went wrong.</h2>
           <p>This part of the application has encountered an error.</p>
           <details style={{ whiteSpace: 'pre-wrap' }}>

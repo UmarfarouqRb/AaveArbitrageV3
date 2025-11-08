@@ -5,6 +5,6 @@ export const networks = {
   },
   'base-mainnet': {
     name: 'Base Mainnet',
-    arbitrageBalancerAddress: "0x...", // Replace with your mainnet address
+    arbitrageBalancerAddress: "0x7Af71A0700380Ffb51c1fB15c2cf71e6551630B2",
   },
 };
