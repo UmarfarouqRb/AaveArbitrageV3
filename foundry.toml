@@ -6,6 +6,7 @@ libs = ['lib']
 test = 'test'
 cache_path  = 'cache_forge'
 via_ir = true
+solc = "0.8.20"
 
 [rpc_endpoints]
 base_sepolia = "${BASE_SEPOLIA_RPC_URL}"

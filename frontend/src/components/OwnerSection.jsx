@@ -1,4 +1,4 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useCallback } from 'react';
 import { Contract, isAddress } from 'ethers';
 import { usePrivy } from '@privy-io/react-auth';
 import { NetworkContext } from '../contexts/NetworkContext';
@@ -13,14 +13,13 @@ const OwnerSection = () => {
   const [withdrawToken, setWithdrawToken] = useState('');
   const [status, setStatus] = useState('');
 
-  const getSignerAndContract = async () => {
+  const getSignerAndContract = useCallback(async () => {
     const provider = await user.wallet.getEthersProvider();
     const signer = await provider.getSigner();
-    const contract = new Contract(networkConfig.arbitrageBalancerAddress, arbitrageBalancerABI, signer);
-    return contract;
-  };
+    return new Contract(networkConfig.arbitrageBalancerAddress, arbitrageBalancerABI, signer);
+  }, [user, networkConfig]);
 
-  const handlePause = async () => {
+  const handlePause = useCallback(async () => {
     setStatus('Pausing contract...');
     try {
       const contract = await getSignerAndContract();
@@ -31,9 +30,9 @@ const OwnerSection = () => {
       console.error("Error pausing contract:", error);
       setStatus(`Error: ${error.reason || error.message}`);
     }
-  };
+  }, [getSignerAndContract]);
 
-  const handleUnpause = async () => {
+  const handleUnpause = useCallback(async () => {
     setStatus('Unpausing contract...');
     try {
       const contract = await getSignerAndContract();
@@ -44,9 +43,9 @@ const OwnerSection = () => {
       console.error("Error unpausing contract:", error);
       setStatus(`Error: ${error.reason || error.message}`);
     }
-  };
+  }, [getSignerAndContract]);
 
-  const handleChangeOwner = async () => {
+  const handleChangeOwner = useCallback(async () => {
     if (!isAddress(newOwner)) {
       setStatus('Please enter a valid Ethereum address for the new owner.');
       return;
@@ -62,9 +61,9 @@ const OwnerSection = () => {
       console.error("Error transferring ownership:", error);
       setStatus(`Error: ${error.reason || error.message}`);
     }
-  };
+  }, [newOwner, getSignerAndContract]);
 
-  const handleWithdraw = async () => {
+  const handleWithdraw = useCallback(async () => {
     if (!isAddress(withdrawToken)) {
       setStatus('Please enter a valid token address to withdraw.');
       return;
@@ -80,7 +79,7 @@ const OwnerSection = () => {
       console.error("Error withdrawing profits:", error);
       setStatus(`Error: ${error.reason || error.message}`);
     }
-  };
+  }, [withdrawToken, getSignerAndContract]);
 
   return (
     <div className="owner-section">

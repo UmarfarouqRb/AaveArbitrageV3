@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useArbitrageOpportunities } from '../hooks/useArbitrageOpportunities';
 import ArbitrageOpportunities from './ArbitrageOpportunities';
 import TradeExecutor from './TradeExecutor';
@@ -8,9 +8,9 @@ const ArbitrageFinder = () => {
   const [arbitrageParams, setArbitrageParams] = useState(null);
   const { opportunities, loading, error } = useArbitrageOpportunities(arbitrageParams);
 
-  const handleFindOpportunities = (params) => {
+  const handleFindOpportunities = useCallback((params) => {
     setArbitrageParams(params);
-  };
+  }, []);
 
   return (
     <div>

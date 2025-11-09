@@ -1,13 +1,12 @@
 import { Link } from 'react-router-dom';
-import './Dashboard.css';
 
 const Dashboard = () => {
   return (
-    <div className="dashboard-container">
-      <h2>Welcome to the Arbitrage Bot Dashboard</h2>
+    <div style={{ padding: '20px', backgroundColor: '#1a1a1a', borderRadius: '8px', textAlign: 'center', color: '#f0f0f0' }}>
+      <h2 style={{ color: '#f0f0f0' }}>Welcome to the Arbitrage Bot Dashboard</h2>
       <p>This is your central hub for managing and monitoring arbitrage opportunities.</p>
-      <div className="dashboard-links">
-        <Link to="/finder" className="dashboard-link">Go to Arbitrage Finder</Link>
+      <div style={{ marginTop: '20px' }}>
+        <Link to="/finder" style={{ color: '#007bff', textDecoration: 'none', fontSize: '1.2em' }}>Go to Arbitrage Finder</Link>
       </div>
     </div>
   );

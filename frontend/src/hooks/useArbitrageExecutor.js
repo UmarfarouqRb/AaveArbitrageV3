@@ -1,4 +1,4 @@
-import { useContext, useState } from 'react';
+import { useContext, useState, useCallback } from 'react';
 import { Contract, formatEther, parseUnits } from 'ethers';
 import { usePrivy } from '@privy-io/react-auth';
 import { NetworkContext } from '../contexts/NetworkContext';
@@ -10,7 +10,7 @@ export const useArbitrageExecutor = () => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState(null);
 
-  const estimateGas = async (opportunity, amount) => {
+  const estimateGas = useCallback(async (opportunity, amount) => {
     if (!user || !networkConfig) {
       return null;
     }
@@ -20,7 +20,8 @@ export const useArbitrageExecutor = () => {
       const arbitrageBalancer = new Contract(networkConfig.arbitrageBalancerAddress, arbitrageBalancerABI, provider);
       const amountInWei = parseUnits(amount, 18);
 
-      const gasEstimate = await arbitrageBalancer.estimateGas.arbitrage(
+      // Correct ethers.js v6 syntax for gas estimation
+      const gasEstimate = await arbitrageBalancer.arbitrage.estimateGas(
         opportunity.tokenA,
         opportunity.tokenB,
         amountInWei,
@@ -28,16 +29,20 @@ export const useArbitrageExecutor = () => {
         opportunity.routerB
       );
 
-      const gasPrice = await provider.getGasPrice();
-      const gasCost = gasEstimate.mul(gasPrice);
+      // Correct ethers.js v6 syntax for getting fee data
+      const feeData = await provider.getFeeData();
+      const gasCost = gasEstimate * feeData.gasPrice;
+      
       return formatEther(gasCost);
     } catch (err) {
       console.error("Error estimating gas:", err);
+      // It's better to propagate the error to the UI
+      setError(err.message || "Error estimating gas.");
       return null;
     }
-  };
+  }, [user, networkConfig]);
 
-  const executeTrade = async (opportunity, amount) => {
+  const executeTrade = useCallback(async (opportunity, amount) => {
     if (!user || !networkConfig) {
       setError("User not authenticated or network not configured.");
       return;
@@ -48,7 +53,8 @@ export const useArbitrageExecutor = () => {
 
     try {
       const provider = await user.wallet.getEthersProvider();
-      const signer = provider.getSigner();
+      // Correct ethers.js v6 syntax for getting the signer
+      const signer = await provider.getSigner();
       const arbitrageBalancer = new Contract(networkConfig.arbitrageBalancerAddress, arbitrageBalancerABI, signer);
 
       const amountInWei = parseUnits(amount, 18);
@@ -69,7 +75,7 @@ export const useArbitrageExecutor = () => {
     } finally {
       setIsExecuting(false);
     }
-  };
+  }, [user, networkConfig]);
 
   return { executeTrade, isExecuting, error, estimateGas };
 };

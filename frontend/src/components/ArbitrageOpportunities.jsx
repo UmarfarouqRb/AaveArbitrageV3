@@ -1,4 +1,4 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useCallback } from 'react';
 import { NetworkContext } from '../contexts/NetworkContext';
 import { useArbitrageExecutor } from '../hooks/useArbitrageExecutor';
 import './ArbitrageOpportunities.css';
@@ -9,7 +9,7 @@ const ArbitrageOpportunities = ({ opportunities, loading, error: fetchError }) =
   const { networkConfig } = useContext(NetworkContext);
   const { executeTrade, isExecuting, error: executionError, estimateGas } = useArbitrageExecutor();
 
-  const handleAmountChange = async (id, value) => {
+  const handleAmountChange = useCallback(async (id, value) => {
     setAmounts(prev => ({ ...prev, [id]: value }));
     const opportunity = opportunities.find(op => op.id === id);
     if (value > 0 && opportunity) {
@@ -24,16 +24,16 @@ const ArbitrageOpportunities = ({ opportunities, loading, error: fetchError }) =
     } else {
       setGasEstimates(prev => ({ ...prev, [id]: null }));
     }
-  };
+  }, [opportunities, estimateGas]);
 
-  const handleExecute = (opportunity) => {
+  const handleExecute = useCallback((opportunity) => {
     const amount = amounts[opportunity.id];
     if (!amount || isNaN(amount) || amount <= 0) {
       alert('Please enter a valid amount.');
       return;
     }
     executeTrade(opportunity, amount);
-  };
+  }, [amounts, executeTrade]);
 
   return (
     <div className="arbitrage-opportunities-container">
