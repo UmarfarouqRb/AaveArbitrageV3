@@ -3,9 +3,15 @@ import ArbitrageBotController from '../components/ArbitrageBotController';
 
 const ArbitrageBotPage = () => {
   return (
-    <div className="page-container">
-      <h1 className="text-3xl font-bold mb-6">Arbitrage Bot</h1>
-      <p className="mb-8 text-gray-400">This tool allows you to manually trigger the arbitrage bot to check for opportunities. The bot will use the private key provided for a single run and will not store it.</p>
+    // Use the main container class for consistent padding and layout
+    <div className="arbitrage-bot-container">
+      {/* Use the header style from the controller for a unified look */}
+      <div className="controller-header">
+        <h3>Arbitrage Bot</h3>
+        <p className="text-color-muted" style={{ marginTop: '0.5rem' }}>
+          Manually trigger the bot to find and execute arbitrage opportunities.
+        </p>
+      </div>
       <ArbitrageBotController />
     </div>
   );

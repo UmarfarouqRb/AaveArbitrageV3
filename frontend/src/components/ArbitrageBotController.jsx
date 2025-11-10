@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useWallet } from '../contexts/WalletContext';
+import { GET_ARBITRAGE_OPPORTUNITIES_URL, EXECUTE_ARBITRAGE_URL } from '../config';
 
 const ArbitrageBotController = () => {
   const {
@@ -54,7 +55,7 @@ const ArbitrageBotController = () => {
     appendLog('Scanning for best arbitrage opportunity...');
 
     try {
-      const opportunitiesResponse = await fetch('/.netlify/functions/get-arbitrage-opportunities', {
+      const opportunitiesResponse = await fetch(GET_ARBITRAGE_OPPORTUNITIES_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ infuraProjectId: infuraApiKey }),
@@ -92,7 +93,7 @@ const ArbitrageBotController = () => {
       const [tokenA, tokenB] = bestOpportunity.tokenAddresses;
       const [routerForSwap1, routerForSwap2] = bestOpportunity.routerAddresses;
 
-      const executionResponse = await fetch('/.netlify/functions/arbitrage-bot', {
+      const executionResponse = await fetch(EXECUTE_ARBITRAGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -4,7 +4,6 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { usePrivy } from '@privy-io/react-auth';
 
 import ErrorBoundary from './components/ErrorBoundary';
-import NetworkSelector from './components/NetworkSelector'; 
 import { WalletProvider } from './contexts/WalletContext';
 
 // Lazy load the page components
@@ -23,7 +22,6 @@ const App = () => {
               <Link to="/">FlashBot</Link>
             </h1>
             <div className="header-controls">
-              <NetworkSelector />
               {ready && authenticated ? (
                 <button onClick={logout} className="button button-secondary">Logout</button>
               ) : (
