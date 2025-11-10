@@ -1,11 +1,16 @@
-const { JsonRpcProvider, Contract, Wallet, AbiCoder, parseUnits, formatUnits, isAddress } = require('ethers');
 
-// ABIs
-const { uniswapV2RouterABI, arbitrageBalancerABI } = require('./abi.js'); // Corrected path
+const { Wallet, JsonRpcProvider, Contract, formatUnits, parseUnits } = require('ethers');
+const { isAddress } = require('ethers');
 
-const routerABI = [
-    ...uniswapV2RouterABI,
-    'function factory() external view returns (address)'
+// ABI for the Arbitrage Balancer contract
+const arbitrageBalancerABI = [
+    "function executeArbitrage(address tokenA, address tokenB, address dexRouter1, address dexRouter2) external payable"
+];
+
+// ABIs for interacting with DEXs and tokens
+const ERC20_ABI = [
+    "function balanceOf(address account) external view returns (uint256)",
+    "function approve(address spender, uint256 amount) external returns (bool)"
 ];
 const pairABI = [
     'function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)',
@@ -14,136 +19,120 @@ const pairABI = [
 const factoryABI = [
     'function getPair(address tokenA, address tokenB) external view returns (address pair)'
 ];
-const ARBITRAGE_BOT_ABI = arbitrageBalancerABI; // Use the destructured variable
+
+const ARBITRAGE_BOT_ABI = arbitrageBalancerABI;
 
 // Constants
 const GAS_LIMIT_ESTIMATE = 450000;
-const DYNAMIC_LOAN_PERCENTAGE = 5; // Using 0.5% of the shallower pool's liquidity.
+const DYNAMIC_LOAN_PERCENTAGE = 5; // Using 0.5% of the shallowest pool's liquidity.
+
+// List of DEXs to scan
+const DEX_CONFIG = [
+    { name: 'BaseSwap', router: '0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24' },
+    { name: 'SushiSwap', router: '0x8cde23bfcc333490347344f2A14a60C803275f4D' },
+    { name: 'Aerodrome', router: '0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43' },
+    { name: 'Wovenswap', router: '0x9948293913214153d1021714457543E5A447617A' }
+];
 
 exports.handler = async function(event, context) {
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: JSON.stringify({ message: 'Method Not Allowed' }) };
     }
 
-    let body;
     try {
-        body = JSON.parse(event.body);
-    } catch (e) {
-        return { statusCode: 400, body: JSON.stringify({ message: 'Invalid JSON format' }) };
-    }
+        const {
+            privateKey,
+            infuraProjectId,
+            tokenA,
+            tokenB,
+            dex1: dexRouter1,
+            dex2: dexRouter2,
+            arbitrageBotAddress,
+            profitThreshold,
+            useDynamicLoan,
+            manualLoanAmount,
+            gasStrategy
+        } = JSON.parse(event.body);
 
-    const {
-        tokenA, tokenB, dex1, dex2, oracleAddress,
-        profitThreshold, useDynamicLoan, manualLoanAmount, gasStrategy, arbitrageBotAddress,
-        infuraProjectId, privateKey // Expecting the raw private key from the unlocked frontend
-    } = body;
-
-    // --- Input Validation ---
-    if (!infuraProjectId) {
-        return { statusCode: 400, body: JSON.stringify({ message: 'Request is missing Infura Project ID.' }) };
-    }
-    if (!privateKey || !(privateKey.startsWith('0x') && privateKey.length === 66)) {
-        return { statusCode: 400, body: JSON.stringify({ message: 'Request is missing a valid private key.' }) };
-    }
-    for (const addr of [tokenA, tokenB, dex1, dex2, oracleAddress, arbitrageBotAddress]) {
-        if (!addr || !isAddress(addr)) {
-            return { statusCode: 400, body: JSON.stringify({ message: `Invalid or missing Ethereum address: ${addr}` }) };
+        // --- Input Validation ---
+        if (!infuraProjectId) {
+            return { statusCode: 400, body: JSON.stringify({ message: 'Request is missing Infura Project ID.' }) };
         }
-    }
-
-    const provider = new JsonRpcProvider(`https://base-mainnet.infura.io/v3/${infuraProjectId}`);
-    const wallet = new Wallet(privateKey, provider);
-
-    try {
-        let loanAmount;
-        // --- Dynamic Loan Amount Calculation ---
-        if (useDynamicLoan) {
-            const router1 = new Contract(dex1, routerABI, provider);
-            const factory1Address = await router1.factory();
-            const factory1 = new Contract(factory1Address, factoryABI, provider);
-            const pair1Address = await factory1.getPair(tokenA, tokenB);
-
-            const router2 = new Contract(dex2, routerABI, provider);
-            const factory2Address = await router2.factory();
-            const factory2 = new Contract(factory2Address, factoryABI, provider);
-            const pair2Address = await factory2.getPair(tokenA, tokenB);
-
-            if (pair1Address === '0x0000000000000000000000000000000000000000' || pair2Address === '0x0000000000000000000000000000000000000000') {
-                return { statusCode: 200, body: JSON.stringify({ isProfitable: false, message: 'Pair does not exist on one or both DEXs.' }) };
+        if (!privateKey || !(privateKey.startsWith('0x') && privateKey.length === 66)) {
+            return { statusCode: 400, body: JSON.stringify({ message: 'Request is missing a valid private key.' }) };
+        }
+        for (const addr of [tokenA, tokenB, arbitrageBotAddress]) {
+            if (!addr || !isAddress(addr)) {
+                return { statusCode: 400, body: JSON.stringify({ message: `Invalid or missing Ethereum address: ${addr}` }) };
             }
+        }
 
-            const pair1 = new Contract(pair1Address, pairABI, provider);
-            const pair2 = new Contract(pair2Address, pairABI, provider);
+        const provider = new JsonRpcProvider(`https://base-mainnet.infura.io/v3/${infuraProjectId}`);
+        const wallet = new Wallet(privateKey, provider);
+        const arbitrageBot = new Contract(arbitrageBotAddress, ARBITRAGE_BOT_ABI, wallet);
 
-            const [[reserves1, token0_1], [reserves2, token0_2]] = await Promise.all([
-                Promise.all([pair1.getReserves(), pair1.token0()]),
-                Promise.all([pair2.getReserves(), pair2.token0()])
-            ]);
+        const tokenAContract = new Contract(tokenA, ERC20_ABI, provider);
 
-            const reserveA_1 = tokenA.toLowerCase() === token0_1.toLowerCase() ? reserves1[0] : reserves1[1];
-            const reserveA_2 = tokenA.toLowerCase() === token0_2.toLowerCase() ? reserves2[0] : reserves2[1];
+        // --- Dynamic Loan Calculation ---
+        let loanAmount;
+        if (useDynamicLoan) {
+            const path = await getPathForTokens(tokenA, tokenB, DEX_CONFIG[0].router, provider);
+            const pairAddress = await getPairAddress(path[0], path[1], DEX_CONFIG[0].router, provider);
+            const pairContract = new Contract(pairAddress, pairABI, provider);
+            const reserves = await pairContract.getReserves();
+            const token0 = await pairContract.token0();
 
-            const smallerReserveA = reserveA_1.lt(reserveA_2) ? reserveA_1 : reserveA_2;
-            loanAmount = smallerReserveA.mul(DYNAMIC_LOAN_PERCENTAGE).div(1000);
+            const reserve = (tokenA.toLowerCase() === token0.toLowerCase()) ? reserves[0] : reserves[1];
+            loanAmount = (reserve * BigInt(DYNAMIC_LOAN_PERCENTAGE)) / BigInt(1000);
         } else {
-            loanAmount = parseUnits(manualLoanAmount || '1', 18);
+            const decimals = await tokenAContract.decimals();
+            loanAmount = parseUnits(manualLoanAmount, decimals);
         }
 
-        if (loanAmount.isZero()) {
-            return { statusCode: 200, body: JSON.stringify({ isProfitable: false, message: 'Calculated loan amount is zero.' }) };
+        if (loanAmount <= 0) {
+            return { statusCode: 200, body: JSON.stringify({ isProfitable: false, message: 'Calculated loan amount is zero or less.' }) };
         }
+
+        // --- Simulate Trade ---
+        const amountOut1 = await getAmountOut(loanAmount, tokenA, tokenB, dexRouter1, provider);
+        const bestFinalAmountA = await getAmountOut(amountOut1, tokenB, tokenA, dexRouter2, provider);
 
         // --- Profitability Check ---
-        const dex1Router = new Contract(dex1, routerABI, provider);
-        const dex2Router = new Contract(dex2, routerABI, provider);
-
-        const [amountsOut1, amountsOut2] = await Promise.all([
-            dex1Router.getAmountsOut(loanAmount, [tokenA, tokenB]),
-            dex2Router.getAmountsOut(loanAmount, [tokenA, tokenB])
-        ]);
-
-        const routerForSwap1 = amountsOut1[1].gt(amountsOut2[1]) ? dex1 : dex2;
-        const routerForSwap2 = amountsOut1[1].gt(amountsOut2[1]) ? dex2 : dex1;
-        
-        const amountB_received = amountsOut1[1].gt(amountsOut2[1]) ? amountsOut1[1] : amountsOut2[1];
-        
-        const finalAmountsOut = await (routerForSwap1 === dex1 ? dex2Router : dex1Router).getAmountsOut(amountB_received, [tokenB, tokenA]);
-        const finalAmountA = finalAmountsOut[1];
-
         const feeData = await provider.getFeeData();
-        let recommendedGasPrice = feeData.gasPrice;
-        if (gasStrategy === 'fast') recommendedGasPrice = feeData.maxPriorityFeePerGas.add(feeData.lastBaseFeePerGas);
-        else if (gasStrategy === 'urgent') recommendedGasPrice = feeData.maxPriorityFeePerGas.add(feeData.lastBaseFeePerGas).mul(12).div(10);
-        
-        const estimatedGasCost = recommendedGasPrice.mul(GAS_LIMIT_ESTIMATE);
-        const parsedProfitThreshold = parseUnits(profitThreshold || '0', 18);
+        let gasPrice;
+        switch(gasStrategy) {
+            case 'fast':
+                gasPrice = feeData.maxFeePerGas * BigInt(12) / BigInt(10); // 1.2x
+                break;
+            case 'urgent':
+                gasPrice = feeData.maxFeePerGas * BigInt(15) / BigInt(10); // 1.5x
+                break;
+            default: // medium
+                gasPrice = feeData.maxFeePerGas;
+        }
 
-        // --- EXECUTION LOGIC ---
-        if (finalAmountA.gt(loanAmount.add(parsedProfitThreshold).add(estimatedGasCost))) {
-            console.log('Profitable opportunity found! Executing trade...');
+        const estimatedGasCost = gasPrice * BigInt(GAS_LIMIT_ESTIMATE);
+        const netProfit = bestFinalAmountA - loanAmount - estimatedGasCost;
 
-            const arbitrageContract = new Contract(arbitrageBotAddress, ARBITRAGE_BOT_ABI, wallet);
-            const abiCoder = new AbiCoder();
-            const userData = abiCoder.encode(
-                ['address', 'address', 'address', 'address'],
-                [tokenA, tokenB, routerForSwap1, routerForSwap2]
-            );
+        console.log(`Potential Profit (in Token A): ${formatUnits(netProfit, 18)}`);
 
-            const tx = await arbitrageContract.arbitrage(tokenA, loanAmount, userData, {
-                gasPrice: recommendedGasPrice,
-                gasLimit: GAS_LIMIT_ESTIMATE
+        const thresholdAmount = parseUnits(profitThreshold || '0', 18);
+
+        if (netProfit > thresholdAmount) {
+            console.log('Profitable trade found! Executing...');
+            const tx = await arbitrageBot.executeArbitrage(tokenA, tokenB, dexRouter1, dexRouter2, {
+                value: loanAmount,
+                gasLimit: GAS_LIMIT_ESTIMATE,
+                gasPrice: gasPrice
             });
-
-            console.log(`Transaction sent: ${tx.hash}`);
-            await tx.wait(); // Wait for the transaction to be mined
-            console.log('Transaction confirmed!');
+            await tx.wait();
 
             return {
                 statusCode: 200,
                 body: JSON.stringify({
                     tradeExecuted: true,
                     txHash: tx.hash,
-                    grossProfit: formatUnits(finalAmountA.sub(loanAmount), 18)
+                    grossProfit: formatUnits(bestFinalAmountA - loanAmount, 18)
                 })
             };
         } else {
@@ -155,3 +144,28 @@ exports.handler = async function(event, context) {
         return { statusCode: 500, body: JSON.stringify({ message: 'An internal error occurred.', error: err.reason || err.message }) };
     }
 };
+
+async function getPathForTokens(tokenA, tokenB, routerAddress, provider) {
+    const router = new Contract(routerAddress, ['function factory() external pure returns (address)'], provider);
+    const factoryAddress = await router.factory();
+    const factory = new Contract(factoryAddress, factoryABI, provider);
+    const pairAddress = await factory.getPair(tokenA, tokenB);
+
+    if (pairAddress === '0x0000000000000000000000000000000000000000') {
+        throw new Error("No direct pair found for the tokens on this DEX.");
+    }
+    return [tokenA, tokenB];
+}
+
+async function getPairAddress(tokenA, tokenB, routerAddress, provider) {
+    const router = new Contract(routerAddress, ['function factory() external pure returns (address)'], provider);
+    const factoryAddress = await router.factory();
+    const factory = new Contract(factoryAddress, factoryABI, provider);
+    return await factory.getPair(tokenA, tokenB);
+}
+
+async function getAmountOut(amountIn, tokenIn, tokenOut, routerAddress, provider) {
+    const router = new Contract(routerAddress, ['function getAmountsOut(uint amountIn, address[] memory path) public view returns (uint[] memory amounts)'], provider);
+    const amounts = await router.getAmountsOut(amountIn, [tokenIn, tokenOut]);
+    return amounts[1];
+}

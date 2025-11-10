@@ -54,9 +54,15 @@ const ArbitrageBotController = () => {
     appendLog('Scanning for best arbitrage opportunity...');
 
     try {
-      const opportunitiesResponse = await fetch('/.netlify/functions/get-arbitrage-opportunities');
+      const opportunitiesResponse = await fetch('/.netlify/functions/get-arbitrage-opportunities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ infuraProjectId: infuraApiKey }),
+      });
+      
       if (!opportunitiesResponse.ok) {
-        throw new Error(`Failed to fetch opportunities: ${opportunitiesResponse.statusText}`);
+          const errorData = await opportunitiesResponse.json();
+          throw new Error(errorData.message || `Failed to fetch opportunities: ${opportunitiesResponse.statusText}`);
       }
       const opportunitiesData = await opportunitiesResponse.json();
       const opportunities = opportunitiesData.opportunities || [];

@@ -1,80 +1,71 @@
 
-import { Suspense, lazy, useContext, useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Suspense, lazy } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { usePrivy } from '@privy-io/react-auth';
-import { Contract } from 'ethers';
-import ErrorBoundary from './components/ErrorBoundary';
-import Layout from './components/Layout';
-import { NetworkContext } from './contexts/NetworkContext';
-import { WalletProvider } from './contexts/WalletContext';
-import { arbitrageBalancerABI, gnosisSafeABI } from './utils/abi';
 
-const ArbitrageFinder = lazy(() => import('./components/ArbitrageFinder'));
+import ErrorBoundary from './components/ErrorBoundary';
+import NetworkSelector from './components/NetworkSelector'; 
+import { WalletProvider } from './contexts/WalletContext';
+
+// Lazy load the page components
 const ArbitrageOpportunitiesPage = lazy(() => import('./pages/ArbitrageOpportunitiesPage'));
-const OwnerSection = lazy(() => import('./components/OwnerSection'));
-const Dashboard = lazy(() => import('./components/Dashboard'));
 const ArbitrageBotPage = lazy(() => import('./pages/ArbitrageBotPage'));
 
 const App = () => {
-  const { user } = usePrivy();
-  const { networkConfig } = useContext(NetworkContext);
-  const [isOwner, setIsOwner] = useState(false);
-
-  useEffect(() => {
-    const checkOwnership = async () => {
-      if (user && networkConfig) {
-        try {
-          const provider = await user.wallet.getEthersProvider();
-          const arbitrageBalancer = new Contract(networkConfig.arbitrageBalancerAddress, arbitrageBalancerABI, provider);
-          const multiSigAddress = await arbitrageBalancer.multiSig();
-
-          const gnosisSafe = new Contract(multiSigAddress, gnosisSafeABI, provider);
-          const owners = await gnosisSafe.getOwners();
-
-          const isUserOwner = owners.map(owner => owner.toLowerCase()).includes(user.wallet.address.toLowerCase());
-          setIsOwner(isUserOwner);
-        } catch (error) {
-          console.error("Error checking ownership:", error);
-          setIsOwner(false);
-        }
-      }
-    };
-
-    checkOwnership();
-  }, [user, networkConfig]);
+  const { login, logout, ready, authenticated } = usePrivy();
 
   return (
     <Router>
       <WalletProvider>
-        <Layout isOwner={isOwner}>
-          <Suspense fallback={<div style={{ textAlign: 'center', padding: '40px' }}><h2>Loading Page...</h2></div>}>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/finder" element={
-                <ErrorBoundary>
-                  <ArbitrageFinder />
-                </ErrorBoundary>
-              } />
-              <Route path="/opportunities" element={
-                <ErrorBoundary>
-                  <ArbitrageOpportunitiesPage />
-                </ErrorBoundary>
-              } />
-              <Route path="/arbitrage-bot" element={
-                <ErrorBoundary>
-                  <ArbitrageBotPage />
-                </ErrorBoundary>
-              } />
-              <Route path="/owner" element={
-                <ErrorBoundary>
-                  {isOwner ? <OwnerSection /> : <Navigate to="/" />}
-                </ErrorBoundary>
-              } />
-            </Routes>
-          </Suspense>
-        </Layout>
+        <div className="app-container">
+          <header className="app-header">
+            <h1 className="app-title">
+              <Link to="/">FlashBot</Link>
+            </h1>
+            <div className="header-controls">
+              <NetworkSelector />
+              {ready && authenticated ? (
+                <button onClick={logout} className="button button-secondary">Logout</button>
+              ) : (
+                <button onClick={login} className="button button-primary">Login</button>
+              )}
+            </div>
+          </header>
+
+          <div className="app-body">
+            <main className="main-content">
+              <Suspense fallback={<div style={{ textAlign: 'center', padding: '40px' }}><h2>Loading...</h2></div>}>
+                <Routes>
+                  <Route path="/" element={
+                    <ErrorBoundary>
+                      <ArbitrageOpportunitiesPage />
+                    </ErrorBoundary>
+                  } />
+                  <Route path="/arbitrage-bot" element={
+                    <ErrorBoundary>
+                      {/* Protect the bot page */}
+                      {ready && authenticated ? <ArbitrageBotPage /> : <LoginPagePrompt />}
+                    </ErrorBoundary>
+                  } />
+                </Routes>
+              </Suspense>
+            </main>
+          </div>
+        </div>
       </WalletProvider>
     </Router>
+  );
+};
+
+// A simple component to prompt users to log in
+const LoginPagePrompt = () => {
+  const { login } = usePrivy();
+  return (
+    <div style={{ textAlign: 'center', padding: '50px' }}>
+      <h2>Please Log In</h2>
+      <p>You need to be logged in to access the Arbitrage Bot.</p>
+      <button onClick={login} className="button button-primary" style={{ marginTop: '20px' }}>Log In</button>
+    </div>
   );
 };
 
