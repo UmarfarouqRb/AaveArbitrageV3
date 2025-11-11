@@ -5,10 +5,13 @@ import { usePrivy } from '@privy-io/react-auth';
 
 import ErrorBoundary from './components/ErrorBoundary';
 import { WalletProvider } from './contexts/WalletContext';
+import { NetworkProvider } from './contexts/NetworkContext';
+import TopNav from './components/TopNav';
 
-// Lazy load the page components
-const ArbitrageOpportunitiesPage = lazy(() => import('./pages/ArbitrageOpportunitiesPage'));
+// Lazy load the pages
 const ArbitrageBotPage = lazy(() => import('./pages/ArbitrageBotPage'));
+const ManualTradePage = lazy(() => import('./pages/ManualTradePage'));
+
 
 const App = () => {
   const { login, logout, ready, authenticated } = usePrivy();
@@ -16,40 +19,46 @@ const App = () => {
   return (
     <Router>
       <WalletProvider>
-        <div className="app-container">
-          <header className="app-header">
-            <h1 className="app-title">
-              <Link to="/">FlashBot</Link>
-            </h1>
-            <div className="header-controls">
-              {ready && authenticated ? (
-                <button onClick={logout} className="button button-secondary">Logout</button>
-              ) : (
-                <button onClick={login} className="button button-primary">Login</button>
-              )}
+        <NetworkProvider>
+          <div className="app-container">
+            <header className="app-header">
+              <h1 className="app-title">
+                <Link to="/">FlashBot</Link>
+              </h1>
+              <div className="header-controls">
+                {ready && authenticated ? (
+                  <button onClick={logout} className="button button-secondary">Logout</button>
+                ) : (
+                  <button onClick={login} className="button button-primary">Login</button>
+                )}
+              </div>
+            </header>
+            <TopNav />
+            <div className="app-body">
+              <main className="main-content">
+                <Suspense fallback={<div style={{ textAlign: 'center', padding: '40px' }}><h2>Loading...</h2></div>}>
+                  <Routes>
+                    <Route path="/" element={
+                      <ErrorBoundary>
+                        {ready && authenticated ? <ArbitrageBotPage /> : <LoginPagePrompt />}
+                      </ErrorBoundary>
+                    } />
+                     <Route path="/arbitrage-bot" element={
+                      <ErrorBoundary>
+                        {ready && authenticated ? <ArbitrageBotPage /> : <LoginPagePrompt />}
+                      </ErrorBoundary>
+                    } />
+                    <Route path="/manual-trade" element={
+                      <ErrorBoundary>
+                        {ready && authenticated ? <ManualTradePage /> : <LoginPagePrompt />}
+                      </ErrorBoundary>
+                    } />
+                  </Routes>
+                </Suspense>
+              </main>
             </div>
-          </header>
-
-          <div className="app-body">
-            <main className="main-content">
-              <Suspense fallback={<div style={{ textAlign: 'center', padding: '40px' }}><h2>Loading...</h2></div>}>
-                <Routes>
-                  <Route path="/" element={
-                    <ErrorBoundary>
-                      <ArbitrageOpportunitiesPage />
-                    </ErrorBoundary>
-                  } />
-                  <Route path="/arbitrage-bot" element={
-                    <ErrorBoundary>
-                      {/* Protect the bot page */}
-                      {ready && authenticated ? <ArbitrageBotPage /> : <LoginPagePrompt />}
-                    </ErrorBoundary>
-                  } />
-                </Routes>
-              </Suspense>
-            </main>
           </div>
-        </div>
+        </NetworkProvider>
       </WalletProvider>
     </Router>
   );
