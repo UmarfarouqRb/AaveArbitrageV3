@@ -1,47 +1,35 @@
 
-const { Contract, formatUnits, parseUnits } = require('ethers');
-const { getProvider } = require('./utils');
+const { ethers } = require('ethers');
+const { NETWORKS, BOT_CONFIG } = require('./config');
 
-const V2_ROUTER_ABI = [
-    'function getAmountsOut(uint amountIn, address[] memory path) public view returns (uint[] memory amounts)',
-];
+// --- Provider ---
+const provider = new ethers.JsonRpcProvider(NETWORKS.base.rpcUrl);
 
-const V2_FACTORY_ABI = [
-    'function getPair(address tokenA, address tokenB) external view returns (address pair)'
-];
+// --- Dynamic Profitability Calculation ---
+async function calculateDynamicProfit(trade) {
+    const gasPrice = await getDynamicGasPrice();
+    const gasCost = BigInt(BOT_CONFIG.GAS_LIMIT) * gasPrice;
+    const slippageCost = (BigInt(trade.amountIn) * BigInt(BOT_CONFIG.SLIPPAGE_TOLERANCE)) / BigInt(10000);
 
-/**
- * Fetches the price for a token pair from a Uniswap V2-compatible DEX.
- *
- * @param {object} tokenIn - The input token details.
- * @param {object} tokenOut - The output token details.
- * @param {object} dex - The DEX to check, including router and factory addresses.
- * @param {string} network - The network name.
- * @param {object} NETWORKS - The networks configuration.
- * @returns {Promise<number>} - The price.
- */
-async function getV2Price(tokenIn, tokenOut, dex, network, NETWORKS) {
-    const provider = getProvider(network, NETWORKS);
-    const factory = new Contract(dex.factory, V2_FACTORY_ABI, provider);
+    const netProfit = BigInt(trade.amountOut) - BigInt(trade.amountIn) - gasCost - slippageCost;
 
-    try {
-        // First, check if the pair exists
-        const pairAddress = await factory.getPair(tokenIn.address, tokenOut.address);
-        if (pairAddress === '0x0000000000000000000000000000000000000000') {
-            // console.log(`Pair ${tokenIn.symbol}/${tokenOut.symbol} does not exist on ${dex.name}`);
-            return 0;
-        }
+    return netProfit;
+}
 
-        // If pair exists, get the price from the router
-        const router = new Contract(dex.router, V2_ROUTER_ABI, provider);
-        const amountIn = parseUnits('1', tokenIn.decimals);
-        const amountsOut = await router.getAmountsOut(amountIn, [tokenIn.address, tokenOut.address]);
-        return parseFloat(formatUnits(amountsOut[1], tokenOut.decimals));
+// --- Dynamic Gas Price Strategy ---
+async function getDynamicGasPrice() {
+    const feeData = await provider.getFeeData();
+    const gasPrice = feeData.gasPrice;
 
-    } catch (error) {
-        // console.error(`Error fetching price from ${dex.name} for ${tokenIn.symbol}/${tokenOut.symbol}:`, error.reason || error.message);
-        return 0;
+    // Adjust gas price based on network congestion
+    if (BOT_CONFIG.GAS_PRICE_STRATEGY === 'fast') {
+        return gasPrice * BigInt(12) / BigInt(10); // 20% premium for faster transactions
+    } else {
+        return gasPrice;
     }
 }
 
-module.exports = { getV2Price };
+module.exports = {
+    calculateDynamicProfit,
+    getDynamicGasPrice
+};

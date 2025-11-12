@@ -1,121 +1,73 @@
-# Flash Loan Arbitrage Bot
 
-This project is a full-stack decentralized application for executing flash loan-based arbitrage opportunities on EVM-compatible blockchains, with a focus on the Base network. It leverages Balancer for flash loans and Uniswap V2 compatible DEXs for trading.
+# Arbitrage Bot
 
-## Architecture
+This is a sophisticated arbitrage bot designed to automatically find and execute profitable trades across different decentralized exchanges (DEXs) on the Base network. It operates by monitoring price differences between DEXs for the same token pairs and executing flash swaps to capitalize on those differences.
 
-The project is structured as a monorepo with three main components:
+## How It Works
 
-1.  **Smart Contracts (`contracts/`):** The core on-chain logic written in Solidity using the Foundry framework.
-    *   `ArbitrageBalancer.sol`: The main contract that receives a flash loan, executes two trades, repays the loan, and sends profits to the initiator.
-    *   `UniswapV2TwapOracle.sol`: An on-chain Time-Weighted Average Price (TWAP) oracle to protect against price manipulation during arbitrage execution.
-    *   **Security Features:** Includes re-entrancy guards, pausable functionality, ownership control, and strict input validation.
+The bot scans for arbitrage opportunities in every new block on the blockchain. Here's a simplified breakdown of its process:
 
-2.  **Frontend (`frontend/`):** A React application built with Vite that provides a user interface for monitoring arbitrage opportunities and interacting with the smart contracts.
+1.  **Scans DEXs**: In each block, the bot fetches the prices of configured token pairs on multiple DEXs.
+2.  **Identifies Opportunities**: It compares the prices of the same token pair across different DEXs. If it finds a price discrepancy, it flags a potential arbitrage opportunity.
+3.  **Calculates Profitability**: The bot calculates the potential profit of the arbitrage, taking into account the dynamic gas fees required to execute the transaction.
+4.  **Executes Trades**: If the calculated net profit is above a defined threshold, the bot will attempt to execute the trade.
 
-3.  **Scripts & Tasks (`tasks/`):** A collection of Javascript scripts for automating interactions with the deployed smart contracts, such as initiating a flash loan or pausing the contract.
+## Security Warning
 
-## Features
+**This bot operates using your private key. The security of your funds is your responsibility.**
 
-- **Flash Loan Integration:** Utilizes Balancer V2 flash loans as the source of capital for arbitrage.
-- **DEX Arbitrage:** Executes trades between two different Uniswap V2 compatible routers.
-- **TWAP Oracle Protection:** Safeguards against price manipulation by verifying the trade price against a TWAP before execution.
-- **Administrative Controls:** The contract is ownable by a multisig wallet, which can pause/unpause the contract, withdraw profits, and manage whitelisted routers.
-- **Flexible Deployment:** Includes deployment scripts for both Foundry (`forge script`) and Javascript (`ethers.js`).
-- **User Interface:** A simple dashboard to find and execute arbitrage opportunities.
+*   **NEVER share your private key with anyone.**
+*   **Do not commit your `.env` file or private key to any public repository.**
+*   **It is highly recommended to use a new, dedicated "hot wallet" for this bot with a limited amount of funds.** Do not use a wallet that holds a significant portion of your assets.
 
 ## Getting Started
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/en/) (v18 or later)
-- [Foundry](https://getfoundry.sh/)
+*   **Node.js**: [Download and install Node.js](https://nodejs.org/)
+*   **Git**: [Download and install Git](https://git-scm.com/)
+*   **A "Hot Wallet"**: A new Ethereum-compatible wallet with a small amount of ETH for gas fees. You can create one with MetaMask or a similar wallet provider.
+*   **Your Private Key**: You will need to export the private key from your new hot wallet.
 
-### Installation
+### Local Setup
 
-1.  **Clone the repository:**
+1.  **Clone the Repository**:
     ```bash
     git clone <repository-url>
-    cd <repository-name>
+    cd <repository-folder>
     ```
 
-2.  **Install Node.js dependencies:**
-    This will install dependencies for the frontend and the interaction scripts.
+2.  **Install Dependencies**:
     ```bash
     npm install
     ```
 
-3.  **Install Solidity dependencies:**
-    Foundry manages Solidity libraries.
+3.  **Create an Environment File**:
+    *   Create a file named `.env` in the `backend` directory.
+    *   Add your private key to this file:
+        ```
+        PRIVATE_KEY=your_private_key_here
+        ```
+
+4.  **Run the Bot**:
     ```bash
-    forge install
+    node backend/bot.js
     ```
 
-### Configuration
+## Deployment to Render
 
-The smart contracts require environment variables for deployment and execution.
+To run the bot 24/7, you can deploy it as a **Background Worker** on a service like Render.
 
-1.  Navigate to the contracts directory: `cd contracts`
-2.  Create a `.env` file.
-3.  Edit the `.env` file with your details:
-    ```
-    PRIVATE_KEY=<YOUR_ETHEREUM_PRIVATE_KEY>
-    MULTISIG_ADDRESS=<YOUR_MULTISIG_WALLET_ADDRESS>
-    ```
-    **Security Note:** Never commit the `.env` file to version control.
+1.  **Create a Render Account**: [Sign up for a free Render account](https://render.com/).
+2.  **Fork this Repository**: Fork this project to your own GitHub account.
+3.  **Create a New Background Worker**:
+    *   From the Render dashboard, click "New" -> "Background Worker".
+    *   Connect your forked repository.
+    *   Use the following settings:
+        *   **Build Command**: `npm install`
+        *   **Start Command**: `node backend/bot.js`
+4.  **Add Your Environment Variable**:
+    *   Go to the "Environment" tab for your new service.
+    *   Add a new environment variable with the key `PRIVATE_KEY` and your private key as the value.
 
-## Usage
-
-### Testing the Contracts
-
-The project uses Foundry for smart contract testing.
-
-```bash
-forge test
-```
-
-### Deployment
-
-The contracts are intended to be deployed on the Base mainnet.
-
-**Option 1: Using Foundry**
-(Requires Foundry to be correctly installed and configured in your environment)
-```bash
-forge script contracts/script/DeployBase.s.sol:DeployBase --rpc-url https://mainnet.base.org --broadcast
-```
-
-**Option 2: Using Javascript (Ethers.js)**
-A Javascript-based deployment script is available as an alternative.
-```bash
-node scripts/deploy.js
-```
-
-After deployment, contract addresses and ABIs will be saved to the `deployments/base-mainnet` directory.
-
-### Interacting with the Contracts
-
-The `tasks/` directory contains scripts to interact with the deployed `ArbitrageBalancer` contract. Before running these, ensure you have a `deployments/base-mainnet/ArbitrageBalancer.json` file.
-
-- **Start a Flash Loan:**
-  ```bash
-  node tasks/start-flash-loan.js --token <TOKEN_ADDRESS> --amount <AMOUNT> ...
-  ```
-- **Pause the Contract:**
-  ```bash
-  node tasks/pause-contract.js
-  ```
-- **Unpause the Contract:**
-  ```bash
-  node tasks/unpause-contract.js
-  ```
-
-### Running the Frontend
-
-Navigate to the `frontend` directory and start the development server.
-
-```bash
-cd frontend
-npm run dev
-```
-
-The application will be available at `http://localhost:5173`.
+Your bot will then be live and running continuously.
