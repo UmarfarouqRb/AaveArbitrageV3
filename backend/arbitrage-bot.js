@@ -1,13 +1,14 @@
 
 require('dotenv').config();
-const { Wallet, Contract, parseUnits, formatUnits } = require('ethers');
-const { NETWORKS, TOKENS, DEX_ROUTERS, DEX_FACTORIES, BOT_CONFIG, PRIVATE_KEY } = require('./config');
-const { getProvider, getTokenDetails, getGasPrice } = require('./utils');
-const { getV2Price } = require('./services');
+const { Wallet, Contract, parseUnits, formatUnits, AbiCoder } = require('ethers');
+const { NETWORKS, TOKENS, DEX_ROUTERS, DEX_FACTORIES, BOT_CONFIG, PRIVATE_KEY, DEX_TYPES, V3_FEE_TIERS } = require('./config');
+const { getProvider, getTokenDetails } = require('./utils');
+const { findBestPathV3, findBestPathV2, encodeV3Path, getDynamicGasPrice } = require('./services');
 const fs = require('fs').promises;
 const path = require('path');
 
-const ARBITRAGE_ABI = require('../deployments/base-mainnet/ArbitrageBalancer.json').abi;
+// CORRECTED ABI PATH
+const ARBITRAGE_ABI = require('../out/AaveArbitrageV3.sol/AaveArbitrageV3.json').abi;
 const TRADE_HISTORY_FILE = path.join(__dirname, 'trade_history.json');
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -39,96 +40,96 @@ async function runBot(networkName) {
         return;
     }
 
-    console.log(`Initializing bot for ${networkName}...`);
+    console.log(`Initializing arbitrage bot for ${networkName}...`);
 
     const provider = getProvider(networkName, NETWORKS);
     const wallet = new Wallet(PRIVATE_KEY, provider);
     const tokenList = TOKENS[networkName];
     const dexRouters = DEX_ROUTERS[networkName];
-    const dexFactories = DEX_FACTORIES[networkName];
 
     console.log(`Bot started on ${networkName}. Wallet: ${wallet.address}`);
+    console.log(`Monitoring for opportunities. Contract: ${BOT_CONFIG.ARBITRAGE_CONTRACT_ADDRESS}`);
 
-    // --- START: Updated Pair Generation Logic ---
     const allTokenSymbols = Object.keys(tokenList);
     const tokenPairs = [];
     const baseTokens = ['WETH', 'USDC'];
 
-    // Pair base tokens with all other tokens
     for (const baseToken of baseTokens) {
         for (const token of allTokenSymbols) {
             if (baseToken === token) continue;
-
-            // Avoid duplicate pairs like [USDC, WETH] if [WETH, USDC] already exists
-            const pairExists = tokenPairs.some(p => 
-                (p[0] === token && p[1] === baseToken)
-            );
-            
+            const pairExists = tokenPairs.some(p => (p[0] === token && p[1] === baseToken));
             if (!pairExists) {
                 tokenPairs.push([baseToken, token]);
             }
         }
     }
-    // --- END: Updated Pair Generation Logic ---
 
-    console.log(`Scanning ${tokenPairs.length} pairs (WETH/USDC based) across ${Object.keys(dexRouters).length} DEXs...`);
+    console.log(`Scanning ${tokenPairs.length} pairs across ${Object.keys(dexRouters).length} DEXs...`);
 
     const scan = async () => {
         try {
-            await scanForArbitrage(tokenPairs, tokenList, dexRouters, dexFactories, networkName, wallet, provider);
+            await scanForArbitrage(tokenPairs, tokenList, dexRouters, networkName, wallet, provider);
         } catch (error) {
-            console.error("An error occurred during the scan:", error);
+            console.error("An error occurred during the main scan loop:", error);
         }
-        setTimeout(scan, BOT_CONFIG.SCAN_INTERVAL);
+        setTimeout(scan, BOT_CONFIG.SCAN_INTERVAL || 5000);
     };
 
     scan();
 }
 
-async function scanForArbitrage(tokenPairs, tokenList, dexRouters, dexFactories, networkName, wallet, provider) {
+async function scanForArbitrage(tokenPairs, tokenList, dexRouters, networkName, wallet, provider) {
     console.log(`
 --- New Scan Started at ${new Date().toLocaleTimeString()} ---`);
     for (const [t1, t2] of tokenPairs) {
         try {
             const tokenA = await getTokenDetails(tokenList[t1], provider);
             const tokenB = await getTokenDetails(tokenList[t2], provider);
+            const loanAmount = (tokenA.symbol === 'WETH' || tokenA.symbol === 'ETH')
+                ? parseUnits('0.5', tokenA.decimals)
+                : parseUnits('500', tokenA.decimals);
 
             for (const dexName1 in dexRouters) {
                 for (const dexName2 in dexRouters) {
                     if (dexName1 === dexName2) continue;
 
-                    await sleep(500);
+                    console.log(`Checking ${tokenA.symbol}->${tokenB.symbol} | Route: ${dexName1} -> ${dexName2}`);
 
-                    const dex1 = { name: dexName1, router: dexRouters[dexName1], factory: dexFactories[dexName1] };
-                    const dex2 = { name: dexName2, router: dexRouters[dexName2], factory: dexFactories[dexName2] };
+                    const path1 = V3_FEE_TIERS[dexName1]
+                        ? await findBestPathV3(dexName1, tokenA.address, tokenB.address, loanAmount)
+                        : await findBestPathV2(dexName1, tokenA.address, tokenB.address, loanAmount);
 
-                    console.log(`Checking ${tokenA.symbol}/${tokenB.symbol} on ${dex1.name} -> ${dex2.name}`);
+                    if (!path1 || path1.amountOut === 0n) continue;
 
-                    const price1 = await getV2Price(tokenA, tokenB, dex1, networkName, NETWORKS);
-                    const price2 = await getV2Price(tokenB, tokenA, dex2, networkName, NETWORKS);
+                    const expectedAmountOut1 = path1.amountOut;
+                    
+                    const path2 = V3_FEE_TIERS[dexName2]
+                        ? await findBestPathV3(dexName2, tokenB.address, tokenA.address, expectedAmountOut1)
+                        : await findBestPathV2(dexName2, tokenB.address, tokenA.address, expectedAmountOut1);
 
-                    if (price1 === 0 || price2 === 0) continue;
+                    if (!path2 || path2.amountOut === 0n) continue;
 
-                    const loanAmount = parseUnits('1', tokenA.decimals);
-                    const amountOut1 = loanAmount * BigInt(Math.floor(price1 * 10000)) / 10000n;
-                    const finalAmountOut = amountOut1 * BigInt(Math.floor(price2 * 10000)) / 10000n;
+                    const finalAmountOut = path2.amountOut;
                     const netProfit = finalAmountOut - loanAmount;
 
-                    if (netProfit > parseUnits(BOT_CONFIG.PROFIT_THRESHOLD, tokenA.decimals)) {
-                        const gasPrice = await getGasPrice(provider, BOT_CONFIG.GAS_PRICE_STRATEGY);
-                        const estimatedGasCost = gasPrice * BigInt(BOT_CONFIG.GAS_LIMIT);
-                        const gasCostInToken = await convertGasCostToToken(estimatedGasCost, tokenA, dex1, provider, networkName);
-
+                    if (netProfit > 0n) {
+                        const gasCostInToken = await convertGasCostToToken(tokenA, provider, networkName);
+                        
                         console.log(`
 --- Potential Opportunity Found! ---`);
                         console.log(`  Pair: ${tokenA.symbol}/${tokenB.symbol}`);
-                        console.log(`  Route: ${dex1.name} -> ${dex2.name}`);
-                        console.log(`  Estimated Profit: ${formatUnits(netProfit, tokenA.decimals)} ${tokenA.symbol}`);
-                        console.log(`  Estimated Gas Cost: ${formatUnits(gasCostInToken, tokenA.decimals)} ${tokenA.symbol}`);
+                        console.log(`  Route: ${dexName1} -> ${dexName2}`);
+                        console.log(`  Loan: ${formatUnits(loanAmount, tokenA.decimals)} ${tokenA.symbol}`);
+                        console.log(`  Return: ${formatUnits(finalAmountOut, tokenA.decimals)} ${tokenA.symbol}`);
+                        console.log(`  Gross Profit: ${formatUnits(netProfit, tokenA.decimals)} ${tokenA.symbol}`);
+                        console.log(`  Est. Gas Cost: ${formatUnits(gasCostInToken, tokenA.decimals)} ${tokenA.symbol}`);
 
                         if (netProfit > gasCostInToken) {
                             console.log(`  ✅ PROFITABLE! Executing trade...`);
-                            await executeArbitrage(wallet, { tokenA, tokenB, dex1, dex2, loanAmount, networkName, netProfit, gasCostInToken });
+                            await executeArbitrage(wallet, {
+                                tokenA, tokenB, loanAmount, path1, path2,
+                                netProfit, gasCostInToken, networkName
+                            });
                         } else {
                             console.log(`  ❌ NOT PROFITABLE after gas. Skipping.`);
                         }
@@ -136,43 +137,79 @@ async function scanForArbitrage(tokenPairs, tokenList, dexRouters, dexFactories,
                 }
             }
         } catch (error) {
-            console.error(`
---- ⚠️ Error processing pair ${t1}/${t2} ---`);
-            console.error(`  > Addresses: ${tokenList[t1]}, ${tokenList[t2]}`);
-            console.error(`  > Error: ${error.message}. Skipping this pair.`);
+            console.error(`Error processing pair ${t1}/${t2}: ${error.message}`);
         }
     }
-    console.log(`--- Scan Finished at ${new Date().toLocaleTimeString()} ---`);
 }
 
-async function convertGasCostToToken(gasCostInWei, token, dex, provider, networkName) {
+async function convertGasCostToToken(tokenA, provider, networkName) {
+    const gasPrice = await getDynamicGasPrice();
+    const estimatedGasCost = BigInt(BOT_CONFIG.GAS_LIMIT) * gasPrice;
     const wethAddress = TOKENS[networkName].WETH;
-    if (token.address.toLowerCase() === wethAddress.toLowerCase()) {
-        return gasCostInWei;
-    }
-    const weth = await getTokenDetails(wethAddress, provider);
-    const wethPriceInToken = await getV2Price(weth, token, dex, networkName, NETWORKS);
-    if (wethPriceInToken === 0) return parseUnits('1000', 18);
 
-    const gasCostInToken = gasCostInWei * BigInt(Math.floor(wethPriceInToken * (10 ** token.decimals))) / (10n ** 18n);
-    return gasCostInToken;
+    if (tokenA.address.toLowerCase() === wethAddress.toLowerCase()) {
+        return estimatedGasCost;
+    }
+
+    const path = await findBestPathV3('UniswapV3', wethAddress, tokenA.address, parseUnits('1', 18));
+    if (!path || path.amountOut === 0n) return parseUnits('1000', 18); // High dummy value
+
+    const priceOfWethInTokenA = path.amountOut;
+    return (estimatedGasCost * priceOfWethInTokenA) / parseUnits('1', 18);
 }
 
 async function executeArbitrage(wallet, trade) {
     console.log(`
 --- EXECUTING ARBITRAGE ---`);
-    const { tokenA, tokenB, dex1, dex2, loanAmount, networkName, netProfit, gasCostInToken } = trade;
+    const { tokenA, loanAmount, path1, path2, netProfit, gasCostInToken, networkName } = trade;
     const explorerUrl = NETWORKS[networkName].explorerUrl;
-
     const arbitrageContract = new Contract(BOT_CONFIG.ARBITRAGE_CONTRACT_ADDRESS, ARBITRAGE_ABI, wallet);
+    const abiCoder = AbiCoder.default;
 
-    let logData = { txHash: '', pair: `${tokenA.symbol}/${tokenB.symbol}`, route: `${dex1.name} -> ${dex2.name}`, profit: 'Calculating...' };
+    let logData = { txHash: '', pair: `${path1.tokens[0]}/${path1.tokens[path1.tokens.length - 1]}`, route: `${path1.dex} -> ${path2.dex}`, profit: 'Calculating...' };
 
     try {
-        const tx = await arbitrageContract.executeArbitrage(
-            tokenA.address, tokenB.address, loanAmount, [dex1.router, dex2.router],
-            { gasLimit: BOT_CONFIG.GAS_LIMIT, gasPrice: await getGasPrice(wallet.provider, BOT_CONFIG.GAS_PRICE_STRATEGY) }
-        );
+        // Build Swap 1
+        const amountOutMin1 = (path1.amountOut * (10000n - BigInt(BOT_CONFIG.SLIPPAGE_TOLERANCE))) / 10000n;
+        const dexParams1 = path1.type === 'V2'
+            ? abiCoder.encode(["bool", "address", "uint256"], [false, DEX_FACTORIES.base[path1.dex], amountOutMin1])
+            : abiCoder.encode(["bytes", "uint256"], [encodeV3Path(path1.tokens, path1.fees), amountOutMin1]);
+
+        const swap1 = {
+            router: DEX_ROUTERS.base[path1.dex],
+            from: path1.tokens[0],
+            to: path1.tokens[path1.tokens.length - 1],
+            dex: DEX_TYPES[path1.dex],
+            dexParams: dexParams1
+        };
+
+        // Build Swap 2
+        const amountOutMin2 = (path2.amountOut * (10000n - BigInt(BOT_CONFIG.SLIPPAGE_TOLERANCE))) / 10000n;
+        const dexParams2 = path2.type === 'V2'
+            ? abiCoder.encode(["bool", "address", "uint256"], [false, DEX_FACTORIES.base[path2.dex], amountOutMin2])
+            : abiCoder.encode(["bytes", "uint256"], [encodeV3Path(path2.tokens, path2.fees), amountOutMin2]);
+
+        const swap2 = {
+            router: DEX_ROUTERS.base[path2.dex],
+            from: path2.tokens[0],
+            to: path2.tokens[path2.tokens.length - 1],
+            dex: DEX_TYPES[path2.dex],
+            dexParams: dexParams2
+        };
+
+        const swaps = [swap1, swap2];
+        const gasPrice = await getDynamicGasPrice();
+        
+        // Final check before sending
+        if (netProfit < gasCostInToken) {
+            console.log("Final check failed: Profit too low. Aborting.");
+            return;
+        }
+
+        const tx = await arbitrageContract.executeArbitrage(tokenA.address, loanAmount, swaps, {
+            gasLimit: BOT_CONFIG.GAS_LIMIT,
+            gasPrice: gasPrice
+        });
 
         console.log(`  > Transaction Sent! Hash: ${tx.hash}`);
         console.log(`  > View on Explorer: ${explorerUrl}/tx/${tx.hash}`);
@@ -181,18 +218,18 @@ async function executeArbitrage(wallet, trade) {
         await logTrade(logData);
 
         const receipt = await tx.wait();
+        const finalProfit = formatUnits(netProfit - gasCostInToken, tokenA.decimals);
 
         if (receipt.status === 1) {
             console.log(`  > ✅ SUCCESS! Transaction confirmed in block ${receipt.blockNumber}`);
-            const finalProfit = formatUnits(netProfit - gasCostInToken, tokenA.decimals);
             await logTrade({ ...logData, status: 'Success', profit: `${finalProfit} ${tokenA.symbol}` });
         } else {
             console.error(`  > ❌ FAILED! Transaction reverted.`);
-            await logTrade({ ...logData, status: 'Failed', error: 'Transaction reverted' });
+            await logTrade({ ...logData, status: 'Failed', profit: '0', error: 'Transaction reverted on-chain' });
         }
     } catch (error) {
         console.error(`  > ❌ EXECUTION FAILED:`, error.reason || error.message);
-        await logTrade({ ...logData, status: 'Failed', error: error.reason || error.message });
+        await logTrade({ ...logData, status: 'Failed', profit: '0', error: error.reason || error.message });
     }
     console.log(`--- EXECUTION FINISHED ---`);
 }

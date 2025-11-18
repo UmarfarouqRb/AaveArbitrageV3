@@ -5,7 +5,7 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY;
 // --- Network Configuration ---
 const NETWORKS = {
     base: {
-        chainId: 8453, // Base Mainnet Chain ID
+        chainId: 8453,
         rpcUrl: `https://base-mainnet.infura.io/v3/${INFURA_PROJECT_ID}`,
         explorerUrl: 'https://basescan.org',
     }
@@ -16,76 +16,68 @@ const TOKENS = {
     base: {
         WETH: '0x4200000000000000000000000000000000000006',
         USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-        OP: '0x4200000000000000000000000000000000000042',
         DAI: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb',
-        DEGEN: '0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed',
-        AERO: '0x940181a94A35A4569E4529A3CDfB74e38FD98631',
-        TOSHI: '0xAC1Bd2486aAf3B5C0fc3Fd868558b082a531B2B4',
-        CBETH: '0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22',
-        SEAM: '0x1C7a460413dD4e964f96D8dFC56E7223cE88CD85',
-        BALD: '0x27D2DECb47DDe3C93B22f8a4a511394315246851',
-        TN100x: '0x553c2f73A4d3244AcA206893c5a89423b3658933',
-        NORMIE: '0x7F12d13B34f5F4f0a9449c16Bcd42f0da47AF200',
-        mfer: '0xE3e3D88a775f28b74a17A206103541b373562688',
-        DOG: '0x593a1923153358c0352A23B44365E295a755c483',
-        HIGHER: '0x0578d8A44db98B23BF096A382e016e29a5Ce0ffe',
-        Mochi: '0x1565bF6d4b68A3626245089335f63934f82d5364',
-        TYBG: '0x0d97F261b1e88845184f678e2d1e7a965450f342',
-        SPEC: '0x335147D3A4425A82939A730d2dD19aA977e2F56b',
-        BPS: '0x485083693213567A17a3A579a3979b625b1f33A5',
-        UNI: '0xda10009cbd5d07dd0cecc66161fc93d7c9000da1',
-        LINK: '0x514910771AF9Ca656af840dff83E8264EcF986CA',
-        WBTC: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
-        USDT: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
-        BRETT: '0x532f27101965dd16442E59d40670FaF5eBB142E4',
-        FRIEND: '0x0bd43384206B352E4D41A306455D75747355ac8c'
+        // Add other commonly used tokens for pathfinding
     }
 };
 
-// --- DEX Configuration (Uniswap V2-compatible) ---
+// --- DEX Configuration --- 
 const DEX_ROUTERS = {
     base: {
-        'SushiSwapV2': '0x8cDe23BFcc333490347344f2A14a60C803275f4D',
-        'BaseSwapV2': '0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24',
-        'AerodromeV2': '0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43',
-        'SynthswapV2': '0x00A35213a37d2C4a9424d5B6A8E192534a6F53C1',
-        'ShezmuV2': '0x2649bB9582A55531d04139e36A1C4e04Af62f928',
-        'CamelotV2': '0x7222c66A4AE5b42Cb111F395A0144933924A1D9e',
-        'HoudiniV2': '0x9157a85d3839b29447432d4a23d9173a4073f327',
-        'RocketSwapV2': '0x2b87612659A1A5B1917711259E1552594619E423',
-        'SwapBased': '0x1a76648f64d84a781073302028243e8a3a339395',
-        'Woofi': '0x8137151A313465711e3b2f8a48705a54948a3d3c',
-        'PancakeSwapV2': '0x1a23DE9A2633003A4A35252a787201584281f782'
+        'Aerodrome': '0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43',
+        'PancakeSwapV3': '0x678Aa4bF4E210cf2166753e054d5b7c31cc7fa86', // <-- UPDATED
+        'UniswapV3': '0x2626664c2603336E57B271c5C0b26F421741e481',
     }
 };
 
+const DEX_QUOTERS = {
+    base: {
+        // Note: PancakeSwap's Smart Router doesn't have a standalone quoter. 
+        // The quoter functionality is integrated. For off-chain quoting, 
+        // we might need to use a different quoter or the mainnet router address.
+        // For now, let's assume the old quoter is still valid for price discovery.
+        'PancakeSwapV3': '0x02b2A343833b5247937A0541434381504A860b0A',
+        'UniswapV3': '0x3d4e44Eb1374240CE5F1B871ab261CD16335154A',
+    }
+};
+
+// Aerodrome uses a V2-style factory
 const DEX_FACTORIES = {
     base: {
-        'SushiSwapV2': '0x42E928bB6327c2B328f2347386d2581d52865230',
-        'BaseSwapV2': '0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6',
-        'AerodromeV2': '0x420DD3817f369d7A95c2d3534e676B34ce444444',
-        'SynthswapV2': '0x21203494575Ac39922265937471578345524628f',
-        'ShezmuV2': '0x7b8AdfA933E034301a18B3f148440333d8bC961a',
-        'PancakeSwapV2': '0x02a84c1b3BBD7401a5f7fa98a384EBC70bB5749E'
+        'Aerodrome': '0x420DD3817f369d7A95c2d3534e676B34ce444444',
     }
 }
 
+const V3_FEE_TIERS = {
+    'PancakeSwapV3': [100, 500, 2500, 10000],
+    'UniswapV3': [100, 500, 3000, 10000],
+};
+
+// Maps DEX name to the enum value in the smart contract
+const DEX_TYPES = {
+    'Aerodrome': 0,
+    'PancakeSwapV3': 1,
+    'UniswapV3': 2,
+};
+
+
 // --- Bot Configuration ---
 const BOT_CONFIG = {
-    ARBITRAGE_CONTRACT_ADDRESS: '0x7Af71A0700380Ffb51c1fB15c2cf71e6551630B2', // Your contract address
+    ARBITRAGE_CONTRACT_ADDRESS: 'YOUR_HYBRID_CONTRACT_ADDRESS_HERE', // IMPORTANT: Replace with your deployed AaveArbitrageV3 contract address
     MIN_PROFIT_THRESHOLD: '0', // Minimum profit in native token (e.g., ETH)
-    GAS_PRICE_STRATEGY: 'fast', // 'standard', 'fast'
-    GAS_LIMIT: 800000,
-    SLIPPAGE_TOLERANCE: 50, // Slippage in basis points (50 = 0.5%)
-    SCAN_INTERVAL: 600000,       // 10 minutes
-    DYNAMIC_LOAN_PERCENTAGE: 5, // 5% of the pool's liquidity for the loan amount
+    GAS_PRICE_STRATEGY: 'fast',
+    GAS_LIMIT: 2000000, // Increased gas limit for complex hybrid trades
+    SLIPPAGE_TOLERANCE: 50, // 0.5%
 };
 
 module.exports = {
     NETWORKS,
     TOKENS,
     DEX_ROUTERS,
+    DEX_QUOTERS,
     DEX_FACTORIES,
+    V3_FEE_TIERS,
+    DEX_TYPES,
     BOT_CONFIG,
     PRIVATE_KEY,
     INFURA_PROJECT_ID
