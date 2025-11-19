@@ -1,139 +1,165 @@
+const { ethers, getAddress } = require('ethers');
+const { TOKENS, TOKEN_DECIMALS, DEX_QUOTERS, V3_FEE_TIERS, DEX_ROUTERS } = require('./config');
 
-const { ethers } = require('ethers');
-const { NETWORKS, BOT_CONFIG, DEX_ROUTERS, DEX_QUOTERS, V3_FEE_TIERS, TOKENS } = require('./config');
-const { multicall } = require('./multicall');
-const IUniswapV3QuoterV2 = require('./abi/IUniswapV3QuoterV2.json');
-const IUniswapV2Router02 = require('./abi/IUniswapV2Router02.json');
+const IUniswapV3QuoterV2ABI = require('./abis/IUniswapV3QuoterV2.json');
+const IUniswapV2RouterABI = require('./abis/IUniswapV2Router.json');
 
-const provider = new ethers.JsonRpcProvider(NETWORKS.base.rpcUrl);
+// --- Path Finding Logic ---
 
-// --- Hybrid Pathfinding Logic (V2 & V3) ---
+async function findBestPath(tokenIn, tokenOut, amountIn, provider, dexWhitelist = Object.keys(DEX_ROUTERS.base)) {
+    const tokenInSymbol = getTokenSymbol(tokenIn);
+    const tokenOutSymbol = getTokenSymbol(tokenOut);
 
-function encodeV3Path(pathTokens, pathFees) {
-    let encoded = "0x" + pathTokens[0].slice(2);
-    for (let i = 0; i < pathFees.length; i++) {
-        encoded += pathFees[i].toString(16).padStart(6, '0') + pathTokens[i + 1].slice(2);
-    }
-    return encoded;
-}
-
-async function findBestPath(tokenIn, tokenOut, amountIn, maxHops = 3) {
-    let bestPath = { amountOut: 0n };
-
-    // 1. Find best V3 paths
-    const v3DEXs = Object.keys(DEX_QUOTERS.base);
-    for (const dex of v3DEXs) {
-        const path = await findBestPathV3(dex, tokenIn, tokenOut, amountIn, maxHops);
-        if (path && path.amountOut > bestPath.amountOut) {
-            bestPath = path;
-        }
-    }
-
-    // 2. Find best V2 paths (Aerodrome)
-    const v2DEXs = ['Aerodrome']; // Add other V2 DEXs here if needed
-    for (const dex of v2DEXs) {
-        const path = await findBestPathV2(dex, tokenIn, tokenOut, amountIn, maxHops);
-        if (path && path.amountOut > bestPath.amountOut) {
-            bestPath = path;
-        }
-    }
-    
-    return bestPath.amountOut > 0n ? bestPath : null;
-}
-
-// --- V3 Specific Pathfinding ---
-async function findBestPathV3(dex, tokenIn, tokenOut, amountIn, maxHops) {
-    const quoter = new ethers.Contract(DEX_QUOTERS.base[dex], IUniswapV3QuoterV2, provider);
-    const intermediateTokens = getIntermediateTokens(tokenIn, tokenOut);
-    let allPossiblePaths = findV3PathsRecursively([tokenIn], [], tokenOut, dex, 0, maxHops, intermediateTokens);
-
-    const quoteCalls = allPossiblePaths.map(p => quoter.interface.encodeFunctionData('quoteExactInput', [encodeV3Path(p.tokens, p.fees), amountIn]));
-    const results = await multicall(provider, quoteCalls.map(c => ({ target: quoter.address, callData: c })));
-
-    let bestPath = { amountOut: 0n };
-    for (let i = 0; i < results.length; i++) {
-        try {
-            const amountOut = ethers.AbiCoder.defaultCoder.decode(['uint256'], results[i])[0];
-            if (amountOut > bestPath.amountOut) {
-                bestPath = { dex, type: 'V3', tokens: allPossiblePaths[i].tokens, fees: allPossiblePaths[i].fees, amountOut };
-            }
-        } catch (e) { /* Ignore failed quotes */ }
-    }
-    return bestPath.amountOut > 0n ? bestPath : null;
-}
-
-function findV3PathsRecursively(currentTokens, currentFees, target, dex, hops, maxHops, intermediates) {
-    let paths = [];
-    const last = currentTokens[currentTokens.length - 1];
-
-    V3_FEE_TIERS[dex].forEach(fee => paths.push({ tokens: [...currentTokens, target], fees: [...currentFees, fee] }));
-
-    if (hops < maxHops) {
-        intermediates.forEach(inter => {
-            if (!currentTokens.includes(inter)) {
-                V3_FEE_TIERS[dex].forEach(fee => {
-                    paths.push(...findV3PathsRecursively([...currentTokens, inter], [...currentFees, fee], target, dex, hops + 1, maxHops, intermediates));
-                });
-            }
-        });
-    }
-    return paths;
-}
-
-// --- V2 Specific Pathfinding (for Aerodrome) ---
-async function findBestPathV2(dex, tokenIn, tokenOut, amountIn, maxHops) {
-    const router = new ethers.Contract(DEX_ROUTERS.base[dex], IUniswapV2Router02, provider);
-    const intermediateTokens = getIntermediateTokens(tokenIn, tokenOut);
-    let allPaths = findV2PathsRecursively([tokenIn], tokenOut, 0, maxHops, intermediateTokens);
-    
-    try {
-        const amountsOut = await Promise.all(allPaths.map(path => router.getAmountsOut(amountIn, path).catch(() => [0n])));
-        let bestPath = { amountOut: 0n };
-        for (let i = 0; i < amountsOut.length; i++) {
-            const amountOut = amountsOut[i][amountsOut[i].length - 1];
-            if (amountOut > bestPath.amountOut) {
-                bestPath = { dex, type: 'V2', tokens: allPaths[i], amountOut };
-            }
-        }
-        return bestPath.amountOut > 0n ? bestPath : null;
-    } catch (e) {
+    if (!tokenInSymbol || !tokenOutSymbol) {
+        console.error(`Could not find symbols for path ${tokenIn} -> ${tokenOut}`);
         return null;
     }
-}
 
-function findV2PathsRecursively(currentPath, target, hops, maxHops, intermediates) {
-    let paths = [[...currentPath, target]];
-    if (hops < maxHops) {
-        intermediates.forEach(inter => {
-            if (!currentPath.includes(inter)) {
-                paths.push(...findV2PathsRecursively([...currentPath, inter], target, hops + 1, maxHops, intermediates));
-            }
-        });
+    const tokenInDecimals = TOKEN_DECIMALS.base[tokenInSymbol];
+    const tokenOutDecimals = TOKEN_DECIMALS.base[tokenOutSymbol];
+
+    let bestPath = {
+        amountOut: 0n,
+        dex: null,
+        path: null,
+        tokens: [],
+        type: null
+    };
+
+    const pathPromises = [];
+
+    for (const dex of dexWhitelist) {
+        if (DEX_QUOTERS.base[dex]) { // V3-style DEXs
+            pathPromises.push(findV3BestPath(dex, tokenIn, tokenOut, amountIn, provider));
+        } else { // V2-style DEXs
+            pathPromises.push(findV2BestPath(dex, tokenIn, tokenOut, amountIn, provider));
+        }
     }
-    return paths;
+
+    const results = await Promise.allSettled(pathPromises);
+
+    for (const result of results) {
+        if (result.status === 'fulfilled' && result.value && result.value.amountOut > bestPath.amountOut) {
+            bestPath = result.value;
+        }
+    }
+
+    if (bestPath.amountOut > 0n) {
+        return bestPath;
+    }
+
+    return null;
 }
 
-function getIntermediateTokens(tokenIn, tokenOut) {
-    return [TOKENS.base.WETH, TOKENS.base.USDC, TOKENS.base.DAI].filter(
-        t => t.toLowerCase() !== tokenIn.toLowerCase() && t.toLowerCase() !== tokenOut.toLowerCase()
-    );
+
+async function findV3BestPath(dex, tokenIn, tokenOut, amountIn, provider) {
+    const quoterAddress = DEX_QUOTERS.base[dex];
+    const quoterContract = new ethers.Contract(quoterAddress, IUniswapV3QuoterV2ABI, provider);
+    const feeTiers = V3_FEE_TIERS[dex];
+
+    let bestPath = { amountOut: 0n, dex, path: null, tokens: [], type: 'V3' };
+
+    // 1. Check direct path
+    for (const fee of feeTiers) {
+        try {
+            const path = ethers.solidityPacked(['address', 'uint24', 'address'], [tokenIn, fee, tokenOut]);
+            const { amountOut } = await quoterContract.quoteExactInput.staticCall(path, amountIn);
+            if (amountOut > bestPath.amountOut) {
+                bestPath = { ...bestPath, amountOut, path, tokens: [tokenIn, tokenOut] };
+            }
+        } catch (e) { /* Path doesn't exist, ignore */ }
+    }
+
+    // 2. Check multi-hop path (via WETH)
+    if (tokenIn !== TOKENS.base.WETH && tokenOut !== TOKENS.base.WETH) {
+         for (const fee1 of feeTiers) {
+            for (const fee2 of feeTiers) {
+                 try {
+                    const path = ethers.solidityPacked(
+                        ['address', 'uint24', 'address', 'uint24', 'address'],
+                        [tokenIn, fee1, TOKENS.base.WETH, fee2, tokenOut]
+                    );
+                    const { amountOut } = await quoterContract.quoteExactInput.staticCall(path, amountIn);
+                    if (amountOut > bestPath.amountOut) {
+                        bestPath = { ...bestPath, amountOut, path, tokens: [tokenIn, TOKENS.base.WETH, tokenOut] };
+                    }
+                } catch (e) { /* Path doesn't exist */ }
+            }
+        }
+    }
+    
+    return bestPath.amountOut > 0n ? bestPath : null;
 }
 
-// --- Common Functions ---
-async function calculateDynamicProfit(trade) {
-    const gasPrice = await getDynamicGasPrice();
-    const gasCost = BigInt(BOT_CONFIG.GAS_LIMIT) * gasPrice;
-    return trade.amountOut - trade.amountIn - gasCost;
+async function findV2BestPath(dex, tokenIn, tokenOut, amountIn, provider) {
+    const routerAddress = DEX_ROUTERS.base[dex];
+    const routerContract = new ethers.Contract(routerAddress, IUniswapV2RouterABI, provider);
+    let bestPath = { amountOut: 0n, dex, path: null, tokens: [], type: 'V2' };
+
+    // 1. Check direct path
+    try {
+        const amounts = await routerContract.getAmountsOut.staticCall(amountIn, [tokenIn, tokenOut]);
+        const amountOut = amounts[amounts.length - 1];
+        if (amountOut > bestPath.amountOut) {
+            bestPath = { ...bestPath, amountOut, tokens: [tokenIn, tokenOut] };
+        }
+    } catch (e) { /* Path doesn't exist, ignore */ }
+
+    // 2. Check multi-hop path (via WETH)
+    if (tokenIn !== TOKENS.base.WETH && tokenOut !== TOKENS.base.WETH) {
+        try {
+            const amounts = await routerContract.getAmountsOut.staticCall(amountIn, [tokenIn, TOKENS.base.WETH, tokenOut]);
+            const amountOut = amounts[amounts.length - 1];
+            if (amountOut > bestPath.amountOut) {
+                 bestPath = { ...bestPath, amountOut, tokens: [tokenIn, TOKENS.base.WETH, tokenOut] };
+            }
+        } catch (e) { /* Path doesn't exist, ignore */ }
+    }
+
+    return bestPath.amountOut > 0n ? bestPath : null;
 }
 
-async function getDynamicGasPrice() {
+
+// --- Gas Price Logic ---
+
+async function getDynamicGasPrice(provider, strategy) {
     const feeData = await provider.getFeeData();
-    return BOT_CONFIG.GAS_PRICE_STRATEGY === 'fast' ? feeData.gasPrice * 12n / 10n : feeData.gasPrice;
+    const baseFee = feeData.gasPrice;
+
+    let multiplier;
+    switch (strategy) {
+        case 'slow':
+            multiplier = 1.1;
+            break;
+        case 'fast':
+            multiplier = 1.3;
+            break;
+        case 'urgent':
+            multiplier = 1.5;
+            break;
+        default:
+            multiplier = 1.2;
+    }
+
+    // Perform floating point multiplication and then convert to BigInt
+    const gasPriceInWei = parseFloat(baseFee.toString()) * multiplier;
+    return BigInt(Math.round(gasPriceInWei));
 }
+
+
+// --- Utility ---
+
+function getTokenSymbol(address, network = 'base') {
+    for (const [symbol, tokenAddress] of Object.entries(TOKENS[network])) {
+        if (getAddress(address) === tokenAddress) {
+            return symbol;
+        }
+    }
+    return null;
+}
+
 
 module.exports = {
-    calculateDynamicProfit,
-    getDynamicGasPrice,
     findBestPath,
-    encodeV3Path
+    getDynamicGasPrice,
 };

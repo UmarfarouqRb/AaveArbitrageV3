@@ -1,36 +1,25 @@
 
-import { useState, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 
-const BotLogs = () => {
-  const [logs, setLogs] = useState([]);
+const BotLogs = ({ logs }) => {
+  const logsEndRef = useRef(null);
 
+  // Auto-scroll to the bottom of the logs
   useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        const response = await fetch('http://localhost:3001/api/logs');
-        if (response.ok) {
-          const data = await response.json();
-          setLogs(data);
-        } else {
-          console.error('Failed to fetch logs');
-        }
-      } catch (error) {
-        console.error('Error fetching logs:', error);
-      }
-    };
-
-    const interval = setInterval(fetchLogs, 5000); // Poll every 5 seconds
-
-    return () => clearInterval(interval);
-  }, []);
+    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [logs]);
 
   return (
     <div className="bot-logs-container">
-      <h3>Bot Logs</h3>
-      <div className="logs-display">
+      <h4 className="logs-header">Live Bot Logs</h4>
+      <div className="logs-content">
         {logs.map((log, index) => (
-          <p key={index}>{log}</p>
+          <div key={index} className="log-entry">
+            <span className="log-timestamp">{new Date().toLocaleTimeString()}:</span>
+            <span className="log-message">{log}</span>
+          </div>
         ))}
+        <div ref={logsEndRef} />
       </div>
     </div>
   );

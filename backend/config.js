@@ -1,12 +1,11 @@
 
-const INFURA_PROJECT_ID = process.env.INFURA_PROJECT_ID;
-const PRIVATE_KEY = process.env.PRIVATE_KEY;
+const { getAddress, parseUnits } = require('ethers');
 
 // --- Network Configuration ---
 const NETWORKS = {
     base: {
         chainId: 8453,
-        rpcUrl: `https://base-mainnet.infura.io/v3/${INFURA_PROJECT_ID}`,
+        rpcUrl: 'https://base-mainnet.infura.io/v3/', // Project ID will be appended in bot.js
         explorerUrl: 'https://basescan.org',
     }
 };
@@ -14,71 +13,110 @@ const NETWORKS = {
 // --- Token Configuration ---
 const TOKENS = {
     base: {
-        WETH: '0x4200000000000000000000000000000000000006',
-        USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-        DAI: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb',
-        // Add other commonly used tokens for pathfinding
+        WETH: getAddress('0x4200000000000000000000000000000000000006'),
+        USDC: getAddress('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'), 
+        cbBTC: getAddress('0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf'),
+        DAI: getAddress('0x50c5725949a6f0c72e6c4a641f24049a917db0cb'),
+        DEGEN: getAddress('0x4ed4e862860bed51a9570b96d89af5e1b0efefed'),
+        BRETT: getAddress('0x532f27101965dd16442e59d40670faf2ebb144e4'),
+        AERO: getAddress('0x940181a94a35a4569e4529a3cdfb74e38fd98631'),
+        cbETH: getAddress('0x2ae3f1ec7f1f5012cfeab0185bfc7aa3cf0dec22'),
+        HIGHER: getAddress('0x0578d8a44db98b23bf096a382e016e29a5ce0ffe'),
+        FRIEND: getAddress('0x0bd488718c4651a08528b931081a24607220556f'),
+        MFER: getAddress('0xe3086852a4b125803c815a1582f17cc4a1226956'),
+        TOSHI: getAddress('0xac1bd2486aaf3bf5c03df39e8499452d84e04049'),
+        DOGINME: getAddress('0x6921b130d297cc43754afba22e5eac0f3f3da462'),
+        TYBG: getAddress('0x0d9c429813e335506451e257017d50b8e2b21a81'),
+        BALD: getAddress('0x27d2decb4a5353dc9f39075e55104935f7956b62'),
+        SEAM: getAddress('0x1c7a460413dd4e964f96d8dfc56e7223ce82cf0a'),
+        TN100X: getAddress('0x554c9251a3501f65523f22144d13374b43aa9d6b'),
+        NORMIE: getAddress('0x7f12d13b34f5f4f0a9449c16bcd42f0da47af200'),
+    }
+};
+
+const TOKEN_DECIMALS = {
+    base: {
+        WETH: 18, USDC: 6, cbBTC: 8, DAI: 18, DEGEN: 18, BRETT: 18, AERO: 18, cbETH: 18,
+        HIGHER: 18, FRIEND: 18, MFER: 18, TOSHI: 18, DOGINME: 18, TYBG: 18, BALD: 18,
+        SEAM: 18, TN100X: 18, NORMIE: 18,
     }
 };
 
 // --- DEX Configuration --- 
 const DEX_ROUTERS = {
     base: {
-        'Aerodrome': '0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43',
-        'PancakeSwapV3': '0x678Aa4bF4E210cf2166753e054d5b7c31cc7fa86', // <-- UPDATED
-        'UniswapV3': '0x2626664c2603336E57B271c5C0b26F421741e481',
+        'Aerodrome': getAddress('0xcf77a3ba9a5ca399b7c97c74d54e5b1beb874e43'),
+        'PancakeV3': getAddress('0x678aa4bf4e210cf2166753e054d5b7c31cc7fa86'),
+        'UniswapV3': getAddress('0x2626664c2603336e57b271c5c0b26f421741e481'),
     }
 };
 
 const DEX_QUOTERS = {
     base: {
-        // Note: PancakeSwap's Smart Router doesn't have a standalone quoter. 
-        // The quoter functionality is integrated. For off-chain quoting, 
-        // we might need to use a different quoter or the mainnet router address.
-        // For now, let's assume the old quoter is still valid for price discovery.
-        'PancakeSwapV3': '0x02b2A343833b5247937A0541434381504A860b0A',
-        'UniswapV3': '0x3d4e44Eb1374240CE5F1B871ab261CD16335154A',
+        'PancakeV3': getAddress('0xb048bbc1ee6b733fffcfb9e9cef7375518e25997'),
+        'UniswapV3': getAddress('0x3d4e44318e88753c0b805842dacfb33a1fc65dc6'),
     }
 };
 
-// Aerodrome uses a V2-style factory
 const DEX_FACTORIES = {
     base: {
-        'Aerodrome': '0x420DD3817f369d7A95c2d3534e676B34ce444444',
+        'Aerodrome': getAddress('0x420dd381b31aef6683db6b902084cb0ffcec40da'),
     }
 }
 
 const V3_FEE_TIERS = {
-    'PancakeSwapV3': [100, 500, 2500, 10000],
+    'PancakeV3': [100, 500, 2500, 10000],
     'UniswapV3': [100, 500, 3000, 10000],
 };
 
-// Maps DEX name to the enum value in the smart contract
 const DEX_TYPES = {
-    'Aerodrome': 0,
-    'PancakeSwapV3': 1,
-    'UniswapV3': 2,
+    'Aerodrome': 0, // Matches contract enum
+    'PancakeV3': 1, // Matches contract enum
+    'UniswapV3': 2, // Matches contract enum
 };
+
+// --- Arbitrage Configuration ---
+
+const LOAN_TOKENS = {
+    USDC: TOKENS.base.USDC,
+    WETH: TOKENS.base.WETH,
+};
+
+const LOAN_AMOUNTS = {
+    USDC: parseUnits('50000', TOKEN_DECIMALS.base.USDC), // 50,000 USDC
+    WETH: parseUnits('25', TOKEN_DECIMALS.base.WETH),       // 25 WETH
+};
+
+
+// Automatically generate pairs for all tokens against all loan tokens
+const ARBITRAGE_PAIRS = Object.values(LOAN_TOKENS).flatMap(loanToken =>
+    Object.values(TOKENS.base)
+        .filter(targetToken => targetToken !== loanToken) // Ensure loan token is not the same as target token
+        .map(targetToken => [loanToken, targetToken])
+);
 
 
 // --- Bot Configuration ---
 const BOT_CONFIG = {
-    ARBITRAGE_CONTRACT_ADDRESS: 'YOUR_HYBRID_CONTRACT_ADDRESS_HERE', // IMPORTANT: Replace with your deployed AaveArbitrageV3 contract address
-    MIN_PROFIT_THRESHOLD: '0', // Minimum profit in native token (e.g., ETH)
+    DRY_RUN: false, 
+    ARBITRAGE_CONTRACT_ADDRESS: getAddress('0x7b2Af90c95A38016aB9e09926500A9A1ca915779'),
+    MIN_PROFIT_THRESHOLD_ETH: '0.0001', // Minimum profit in ETH to trigger a trade
     GAS_PRICE_STRATEGY: 'fast',
-    GAS_LIMIT: 2000000, // Increased gas limit for complex hybrid trades
-    SLIPPAGE_TOLERANCE: 50, // 0.5%
+    AAVE_FLASH_LOAN_FEE: 0.0009, // 0.09%
+    ESTIMATED_GAS_COST_ETH: '0', // Estimated gas cost in ETH
 };
 
 module.exports = {
     NETWORKS,
     TOKENS,
+    TOKEN_DECIMALS,
     DEX_ROUTERS,
     DEX_QUOTERS,
     DEX_FACTORIES,
     V3_FEE_TIERS,
     DEX_TYPES,
+    LOAN_TOKENS,
+    LOAN_AMOUNTS,
+    ARBITRAGE_PAIRS,
     BOT_CONFIG,
-    PRIVATE_KEY,
-    INFURA_PROJECT_ID
 };

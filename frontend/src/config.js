@@ -9,3 +9,4 @@ const API_BASE_URL = 'https://arbitrage-app1.fly.dev';
 export const GET_ARBITRAGE_OPPORTUNITIES_URL = `${API_BASE_URL}/api/trade-history`;
 export const EXECUTE_TRADE_URL = `${API_BASE_URL}/api/execute-trade`;
 export const SIMULATE_TRADE_URL = `${API_BASE_URL}/api/simulate-trade`;
+export const PREPARE_TRADE_URL = `${API_BASE_URL}/api/prepare-trade`;

@@ -7,7 +7,7 @@ const TopNav = () => {
         <NavLink to="/arbitrage-bot" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             Bot Status
         </NavLink>
-        <NavLink to="/manual-trade" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+        <NavLink to="/" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
             Manual Trade
         </NavLink>
         <NavLink to="/history" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>

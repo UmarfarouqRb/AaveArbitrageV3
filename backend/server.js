@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { fork } = require('child_process');
 const { simulateTrade } = require('./simulate-manual-trade');
-const { executeTrade } = require('./execute-manual-trade');
+const { prepareTrade } = require('./prepare-manual-trade'); // Import the new module
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -18,26 +18,25 @@ const logStream = fs.createWriteStream(BOT_LOG_FILE, { flags: 'a' });
 app.use(cors());
 app.use(express.json());
 
-if (process.env.NODE_ENV === 'production') {
-    console.log('Starting arbitrage bot in production mode...');
-    const botProcess = fork(path.join(__dirname, 'bot.js'), [], {
-        stdio: ['pipe', 'pipe', 'pipe', 'ipc']
-    });
+// --- Bot Process Management ---
+console.log('Starting arbitrage bot...');
+const botProcess = fork(path.join(__dirname, 'bot.js'), [], {
+    stdio: ['pipe', 'pipe', 'pipe', 'ipc']
+});
 
-    // Redirect bot's stdout and stderr to the log file and the console
-    botProcess.stdout.pipe(process.stdout);
-    botProcess.stderr.pipe(process.stderr);
-    botProcess.stdout.pipe(logStream);
-    botProcess.stderr.pipe(logStream);
+// Redirect bot's stdout and stderr to the log file and the console
+botProcess.stdout.pipe(process.stdout);
+botProcess.stderr.pipe(process.stderr);
+botProcess.stdout.pipe(logStream);
+botProcess.stderr.pipe(logStream);
 
-    botProcess.on('exit', (code) => {
-        console.error(`Arbitrage bot exited with code ${code}. Restarting...`);
-        // You might want to add a delay or a maximum restart count here
-        fork(path.join(__dirname, 'bot.js'));
-    });
-} else {
-    console.log('Skipping bot startup in development mode.');
-}
+botProcess.on('exit', (code) => {
+    console.error(`Arbitrage bot exited with code ${code}. Restarting...`);
+    // You might want to add a delay or a maximum restart count here
+    fork(path.join(__dirname, 'bot.js'));
+});
+
+// --- API Endpoints ---
 
 app.get('/api/status', (req, res) => {
     res.json({ status: 'ok', message: 'Backend is running' });
@@ -82,22 +81,26 @@ app.post('/api/simulate-trade', async (req, res) => {
     }
 });
 
-app.post('/api/execute-trade', async (req, res) => {
+// New endpoint for preparing the manual trade
+app.post('/api/prepare-manual-trade', async (req, res) => {
     try {
         const tradeParams = req.body;
-        console.log("Executing trade with params:", tradeParams);
+        console.log("Preparing manual trade with params:", tradeParams);
 
+        // First, simulate the trade to ensure it's profitable
         const simulationResult = await simulateTrade(tradeParams);
         if (!simulationResult.isProfitable) {
             console.warn(`[SECURITY] Blocked unprofitable manual trade. Estimated Profit: ${simulationResult.estimatedProfit}`);
-            return res.status(400).json({ message: "Trade is not profitable. Execution aborted." });
+            return res.status(400).json({ message: "Trade is not profitable. Preparation aborted." });
         }
 
-        const result = await executeTrade(tradeParams);
-        res.json(result);
+        // If profitable, prepare the unsigned transaction
+        const unsignedTx = await prepareTrade(tradeParams);
+        res.json({ unsignedTx });
+
     } catch (error) {
-        console.error('Execution Error:', error);
-        res.status(500).json({ message: error.message || 'An unexpected error occurred during execution.' });
+        console.error('Trade Preparation Error:', error);
+        res.status(500).json({ message: error.message || 'An unexpected error occurred during trade preparation.' });
     }
 });
 

@@ -40,7 +40,7 @@ const App = () => {
                   <Routes>
                     <Route path="/" element={
                       <ErrorBoundary>
-                        {ready && authenticated ? <ArbitrageBotPage /> : <LoginPagePrompt />}
+                        {ready && authenticated ? <ManualTradePage /> : <LoginPagePrompt />}
                       </ErrorBoundary>
                     } />
                      <Route path="/arbitrage-bot" element={

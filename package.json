@@ -4,6 +4,7 @@
     "@nomiclabs/hardhat-ethers": "^2.2.3",
     "chai": "^6.2.1",
     "dotenv": "^17.2.3",
-    "hardhat": "^3.0.15"
+    "hardhat": "^3.0.15",
+    "ws": "^8.18.3"
   }
 }

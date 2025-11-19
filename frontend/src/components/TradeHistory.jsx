@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React from 'react';
 import styled from 'styled-components';
 
 const Container = styled.div`
@@ -21,48 +22,39 @@ const TradeList = styled.ul`
 const TradeItem = styled.li`
   background: #f9f9f9;
   border: 1px solid #eee;
-  padding: 10px;
+  padding: 15px;
   margin-bottom: 10px;
   border-radius: 4px;
 `;
 
-const ErrorMessage = styled.p`
-  color: red;
-  text-align: center;
+const InputData = styled.pre`
+  background-color: #f0f0f0;
+  padding: 10px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.85em;
+  margin-top: 10px;
 `;
 
-const TradeHistory = () => {
-  const [trades, setTrades] = useState([]);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    const fetchTradeHistory = async () => {
-      try {
-        const response = await fetch('/api/trade-history');
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
-        }
-        const data = await response.json();
-        setTrades(data);
-      } catch (error) {
-        setError('Failed to fetch trade history.');
-        console.error('Fetch error:', error);
-      }
-    };
-
-    fetchTradeHistory();
-  }, []);
-
+const TradeHistory = ({ trades }) => {
   return (
     <Container>
       <Header>Trade History</Header>
-      {error && <ErrorMessage>{error}</ErrorMessage>}
       {trades.length > 0 ? (
         <TradeList>
           {trades.map((trade, index) => (
             <TradeItem key={index}>
-              <p>Profit: {trade.profit}</p>
-              <p>Path: {trade.path.join(' -> ')}</p>
+              <p><strong>Profit:</strong> {trade.profit}</p>
+              <p><strong>Route:</strong> {trade.route}</p>
+              <p><strong>Transaction:</strong> <a href={trade.transactionUrl} target="_blank" rel="noopener noreferrer">View on Basescan</a></p>
+              {trade.input && (
+                <>
+                  <strong>Input Data:</strong>
+                  <InputData>{trade.input}</InputData>
+                </>
+              )}
             </TradeItem>
           ))}
         </TradeList>
