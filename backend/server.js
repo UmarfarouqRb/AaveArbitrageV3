@@ -1,4 +1,5 @@
 
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
@@ -12,9 +13,7 @@ const port = process.env.PORT || 3001;
 const host = '0.0.0.0';
 
 // --- CORS Configuration ---
-// In production, we only want to allow requests from our deployed frontend.
-// We use an environment variable (FRONTEND_URL) to define the allowed origin.
-const allowedOrigins = ['http://localhost:5173']; // Allow localhost for development
+const allowedOrigins = ['http://localhost:5173'];
 if (process.env.FRONTEND_URL) {
   allowedOrigins.push(process.env.FRONTEND_URL);
 }
@@ -36,25 +35,25 @@ const TRADE_HISTORY_FILE = path.join(__dirname, 'trade_history.json');
 const MANUAL_TRADE_HISTORY_FILE = path.join(__dirname, 'manual_trade_history.json');
 const BOT_LOG_FILE = path.join(__dirname, 'bot.log');
 
-// Create a writable stream for the bot's logs
 const logStream = fs.createWriteStream(BOT_LOG_FILE, { flags: 'a' });
 
-// --- Bot Process Management ---
+// --- Bot Process Management (Restart Disabled) ---
 console.log('Starting arbitrage bot...');
 const botProcess = fork(path.join(__dirname, 'bot.js'), [], {
-    stdio: ['pipe', 'pipe', 'pipe', 'ipc']
+    stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+    env: process.env
 });
 
-// Redirect bot's stdout and stderr to the log file and the console
 botProcess.stdout.pipe(process.stdout);
 botProcess.stderr.pipe(process.stderr);
 botProcess.stdout.pipe(logStream);
 botProcess.stderr.pipe(logStream);
 
 botProcess.on('exit', (code) => {
-    console.error(`Arbitrage bot exited with code ${code}. Restarting...`);
-    fork(path.join(__dirname, 'bot.js'));
+    console.error(`--- Bot process exited with code ${code}. Automatic restart is disabled. ---`);
+    console.error('Investigate the bot logs for the root cause of the failure.');
 });
+
 
 // --- API Endpoints ---
 

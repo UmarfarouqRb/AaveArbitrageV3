@@ -42,12 +42,20 @@ const TOKEN_DECIMALS = {
     }
 };
 
-// --- DEX Configuration --- 
+// --- DEX Configuration ---
 const DEX_ROUTERS = {
     base: {
-        'Aerodrome': getAddress('0xcf77a3ba9a5ca399b7c97c74d54e5b1beb874e43'),
-        'PancakeV3': getAddress('0x678aa4bf4e210cf2166753e054d5b7c31cc7fa86'),
-        'UniswapV3': getAddress('0x2626664c2603336e57b271c5c0b26f421741e481'),
+        'Aerodrome': {
+            router: getAddress('0xcf77a3ba9a5ca399b7c97c74d54e5b1beb874e43'),
+            factory: getAddress('0x420dd381b31aef6683db6b902084cb0ffcec40da'),
+            stable: false, // Default to volatile
+        },
+        'PancakeV3': {
+            router: getAddress('0x678aa4bf4e210cf2166753e054d5b7c31cc7fa86'),
+        },
+        'UniswapV3': {
+            router: getAddress('0x2626664c2603336e57b271c5c0b26f421741e481'),
+        },
     }
 };
 
@@ -57,12 +65,6 @@ const DEX_QUOTERS = {
         'UniswapV3': getAddress('0x3d4e44318e88753c0b805842dacfb33a1fc65dc6'),
     }
 };
-
-const DEX_FACTORIES = {
-    base: {
-        'Aerodrome': getAddress('0x420dd381b31aef6683db6b902084cb0ffcec40da'),
-    }
-}
 
 const V3_FEE_TIERS = {
     'PancakeV3': [100, 500, 2500, 10000],
@@ -102,6 +104,7 @@ const BOT_CONFIG = {
     ARBITRAGE_CONTRACT_ADDRESS: getAddress('0x7b2Af90c95A38016aB9e09926500A9A1ca915779'),
     MIN_PROFIT_THRESHOLD_ETH: '0.0001', // Minimum profit in ETH to trigger a trade
     GAS_PRICE_STRATEGY: 'fast',
+    GAS_LIMIT: '1000000',
     AAVE_FLASH_LOAN_FEE: 0.0009, // 0.09%
     ESTIMATED_GAS_COST_ETH: '0', // Estimated gas cost in ETH
 };
@@ -112,7 +115,6 @@ module.exports = {
     TOKEN_DECIMALS,
     DEX_ROUTERS,
     DEX_QUOTERS,
-    DEX_FACTORIES,
     V3_FEE_TIERS,
     DEX_TYPES,
     LOAN_TOKENS,

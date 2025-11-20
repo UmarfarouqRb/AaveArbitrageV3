@@ -1,38 +1,22 @@
+# Project Improvement Plan
 
-# Future Enhancements & Improvement Suggestions
+This document outlines the recommended improvements to enhance the reliability and efficiency of the arbitrage bot.
 
-This document outlines potential future improvements for the arbitrage bot. The current implementation is fully functional and secure, but these suggestions can enhance its usability, security posture, and on-chain efficiency.
+## 1. V2 Pool Type Detection
 
----
+**Issue:** The current implementation does not differentiate between stable and volatile pools for Uniswap V2-like DEXs. This can lead to incorrect transaction parameters and failed trades.
 
-### 1. Enhance Frontend User Experience
+**Recommendation:**
 
-The current control panel is functional, but as features grow, the user experience can be significantly improved.
+1.  **Update DEX Configuration:** Add a `stable` flag and a `factory` address to the DEX configuration for V2 pools in `backend/config.js`.
+2.  **Modify Path-Finding Logic:** Update the `findV2BestPath` function in `backend/services.js` to determine the pool type (stable or volatile) and include this information in the returned path object.
+3.  **Correct `dexParams` Encoding:** Modify the `prepareTrade` function in `backend/prepare-manual-trade.js` and the `findAndExecuteArbitrage` function in `backend/bot.js` to use the `stable` flag from the path object to correctly encode the `dexParams` for V2 swaps.
 
-*   **UI Organization:**
-    *   **Suggestion:** Group related settings into collapsible sections or tabs (e.g., "Network & Keys," "DEX & Token Pairs," "Bot Parameters").
-    *   **Benefit:** Reduces clutter and makes the interface cleaner and more intuitive for users to configure the bot.
+## 2. Dynamic Gas Estimation
 
-*   **Structured Logging:**
-    *   **Suggestion:** Convert the log from a simple text area into a structured list. Each log entry could be an object with properties like `timestamp`, `message`, and `status` (`INFO`, `SUCCESS`, `ERROR`).
-    *   **Benefit:** This allows for rich features like color-coding logs (green for successful trades, red for errors), filtering logs by type, and easier parsing of bot activity.
+**Issue:** The bot currently uses a fixed `GAS_LIMIT` from the configuration, which is inefficient and can lead to out-of-gas errors or wasted gas.
 
----
+**Recommendation:**
 
-### 2. Add an Extra Layer of Client-Side Security
-
-While the "hot wallet" model is the primary security guarantee, we can add further client-side protections common in wallet applications.
-
-*   **Auto-Lock Timer:**
-    *   **Suggestion:** Implement a feature that automatically locks the wallet after a configurable period of inactivity (e.g., 15 minutes).
-    *   **Benefit:** This enhances security by ensuring the decrypted private key does not remain in the browser's memory indefinitely. If the user steps away from their computer, the application will automatically secure itself by calling the `lockWallet()` function, requiring a password for the next use.
-
----
-
-### 3. More Granular On-Chain Control (Advanced)
-
-This advanced suggestion adds a layer of separation between operational funds and profits at the smart contract level.
-
-*   **Designated Profit Vault:**
-    *   **Suggestion:** Modify the `ArbitrageBalancer.sol` smart contract with a new administrative function that allows the contract `owner` (a secure multisig wallet) to set a separate "profit vault" address.
-    *   **Benefit:** The `arbitrage()` function can be updated to automatically transfer any profits directly to this secure vault address instead of back to the bot's operational hot wallet. This keeps the hot wallet's balance consistently low (only containing gas money) and moves profits to a more secure, cold-storage environment in an automated fashion, reducing risk.
+1.  **Remove Hardcoded Gas Limit:** Remove the `gasLimit` from the transaction options in `frontend/src/components/ManualTrade.jsx` and `backend/bot.js`.
+2.  **Implement Dynamic Gas Estimation:** Before sending a transaction, use the `estimateGas` method from `ethers.js` to dynamically estimate the required gas limit. This will ensure that transactions are sent with an appropriate amount of gas, improving reliability and reducing costs.

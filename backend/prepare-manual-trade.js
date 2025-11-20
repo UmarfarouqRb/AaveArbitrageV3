@@ -1,12 +1,11 @@
-
-const { Contract, AbiCoder, parseUnits, solidityPacked } = require('ethers');
+const { Contract, AbiCoder, parseUnits, solidityPacked, getAddress } = require('ethers');
 const { getDexConfig, getProvider, getGasPrice } = require('./utils');
-const { NETWORKS, BOT_CONFIG, DEX_TYPES } = require('./config');
+const { NETWORKS, BOT_CONFIG, DEX_TYPES, TOKENS } = require('./config');
 const { AAVE_ARBITRAGE_V3_ABI } = require('./abi.js');
 const ERC20_ABI = ["function decimals() external view returns (uint8)"];
 
 async function prepareTrade(tradeParams) {
-    const { network, tokenA, tokenB, dex1, dex2, loanAmount, userAddress, bestFee1, bestFee2, stable } = tradeParams;
+    const { network, tokenA, tokenB, dex1, dex2, loanAmount, userAddress, bestFee1, bestFee2 } = tradeParams;
 
     if (!userAddress) {
         throw new Error("User address is required to prepare a trade.");
@@ -22,28 +21,26 @@ async function prepareTrade(tradeParams) {
     const tokenADecimals = await tokenAContract.decimals();
     const loanAmountBigInt = parseUnits(loanAmount, tokenADecimals);
 
+    const stablecoins = [TOKENS.base.USDC, TOKENS.base.DAI].map(t => getAddress(t));
+    const isStableSwap = stablecoins.includes(getAddress(tokenA)) && stablecoins.includes(getAddress(tokenB));
+
     const defaultAbiCoder = new AbiCoder();
 
-    // Correctly encodes dexParams based on the DEX type to match the smart contract's expectations.
     const getDexParams = (dexName, fromToken, toToken, fee, dexConfig, isStable) => {
         const dexType = DEX_TYPES[dexName];
 
-        if (dexType === 1) { // V3 DEX (e.g., PancakeSwap)
-            // For V3, the contract expects abi.encode(bytes path, uint256 amountOutMinimum)
+        if (dexType === 1 || dexType === 2) { // V3 DEXs
             const path = solidityPacked(['address', 'uint24', 'address'], [fromToken, fee, toToken]);
             return defaultAbiCoder.encode(['bytes', 'uint256'], [path, 0]);
 
-        } else if (dexType === 0) { // V2 DEX (e.g., Aerodrome)
-            // For Aerodrome, the contract expects abi.encode(bool stable, address factory, uint256 amountOutMin)
-            // Note: `isStable` must be passed from the frontend. We default to false.
-            const factory = dexConfig.factory; // Assumes factory address is in the config
+        } else if (dexType === 0) { // V2 DEX
+            const factory = dexConfig.factory;
             if (!factory) {
                 throw new Error(`Factory address for ${dexName} is not configured.`);
             }
-            return defaultAbiCoder.encode(['bool', 'address', 'uint256'], [isStable || false, factory, 0]);
+            return defaultAbiCoder.encode(['bool', 'address', 'uint256'], [isStable, factory, 0]);
 
         } else {
-            // Fallback for other DEX types, though currently only V2/V3 are handled.
             return defaultAbiCoder.encode(['uint256'], [0]);
         }
     };
@@ -54,14 +51,14 @@ async function prepareTrade(tradeParams) {
             from: tokenA,
             to: tokenB,
             dex: DEX_TYPES[dex1],
-            dexParams: getDexParams(dex1, tokenA, tokenB, bestFee1, dexConfig1, stable)
+            dexParams: getDexParams(dex1, tokenA, tokenB, bestFee1, dexConfig1, isStableSwap)
         },
         {
             router: dexConfig2.router,
             from: tokenB,
             to: tokenA,
             dex: DEX_TYPES[dex2],
-            dexParams: getDexParams(dex2, tokenB, tokenA, bestFee2, dexConfig2, stable)
+            dexParams: getDexParams(dex2, tokenB, tokenA, bestFee2, dexConfig2, isStableSwap)
         }
     ];
 
@@ -73,7 +70,6 @@ async function prepareTrade(tradeParams) {
         loanAmountBigInt,
         swaps,
         {
-            gasLimit: BOT_CONFIG.GAS_LIMIT,
             gasPrice: gasPrice,
             from: userAddress
         }

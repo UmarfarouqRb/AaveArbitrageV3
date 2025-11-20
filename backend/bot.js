@@ -1,4 +1,4 @@
-require('dotenv').config();
+
 const path = require('path');
 const { ethers, formatUnits, getAddress, AbiCoder } = require('ethers');
 const { NETWORKS, TOKENS, TOKEN_DECIMALS, ARBITRAGE_PAIRS, LOAN_AMOUNTS, DEX_TYPES, BOT_CONFIG, DEX_ROUTERS } = require('./config');
@@ -9,9 +9,32 @@ const AaveArbitrageV3Json = require(path.join(__dirname, '../out/AaveArbitrageV3
 const IArbitrageABI = AaveArbitrageV3Json.abi;
 
 // --- Globals ---
-const activeNetwork = 'base'; 
+const activeNetwork = 'base';
 const provider = new ethers.AlchemyProvider(activeNetwork, process.env.ALCHEMY_API_KEY);
-const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+
+// --- Wallet Initialization with Debugging ---
+console.log('--- Private Key Diagnostic ---');
+console.log('Attempting to initialize wallet...');
+if (!process.env.PRIVATE_KEY) {
+    console.error('!!! FATAL: PRIVATE_KEY environment variable was not received by the bot process!');
+    process.exit(1);
+}
+
+let wallet;
+try {
+    // WARNING: The following line logs your private key. This is for debugging purposes ONLY.
+    console.log(`DEBUG: Private key loaded in bot: "${process.env.PRIVATE_KEY}"`);
+    wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+} catch (error) {
+    console.error('!!! CRITICAL ERROR: Failed to initialize wallet. The private key is invalid. !!!');
+    console.error('Error details:', error.message);
+    process.exit(1);
+}
+console.log('Wallet initialized successfully.');
+console.log(`Wallet Address: ${wallet.address}`);
+console.log('-----------------------------');
+
+
 const arbitrageContract = new ethers.Contract(BOT_CONFIG.ARBITRAGE_CONTRACT_ADDRESS, IArbitrageABI, wallet);
 const wss = new WebSocket.Server({ port: 8080 });
 
@@ -44,30 +67,49 @@ async function findAndExecuteArbitrage(pair) {
     if (!path2) return { status: 'NO_OPPORTUNITY' };
 
     // 3. Calculate Profitability
-    const netProfit = await calculateNetProfit(loanAmount, path2.amountOut, loanTokenAddress);
-    const minProfit = ethers.parseEther(BOT_CONFIG.MIN_PROFIT_THRESHOLD_ETH);
+    const netProfit = path2.amountOut - loanAmount; // Simplified calculation
+    const minProfit = ethers.parseUnits(BOT_CONFIG.MIN_PROFIT_THRESHOLD_ETH, TOKEN_DECIMALS.base[loanTokenSymbol]);
 
     const data = `Net profit: ${formatUnits(netProfit, TOKEN_DECIMALS.base[loanTokenSymbol])} ${loanTokenSymbol}`;
     console.log(data);
 
     if (netProfit <= minProfit) return { status: 'NO_OPPORTUNITY' };
-    
+
     // 4. Construct Swaps
-    const defaultAbiCoder = new AbiCoder();
+    const getDexParams = (path, dexConfig) => {
+        const dexType = DEX_TYPES[path.dex];
+        const defaultAbiCoder = new AbiCoder();
+
+        if (dexType === 1 || dexType === 2) { // V3 DEXs
+            return defaultAbiCoder.encode(['bytes', 'uint256'], [path.path, 0]);
+        } else if (dexType === 0) { // V2 DEX
+            const factory = dexConfig.factory;
+            if (!factory) {
+                throw new Error(`Factory address for ${path.dex} is not configured.`);
+            }
+            return defaultAbiCoder.encode(['bool', 'address', 'uint256'], [path.stable, factory, 0]);
+        } else {
+            return defaultAbiCoder.encode(['uint256'], [0]);
+        }
+    };
+
+    const dexConfig1 = DEX_ROUTERS.base[path1.dex];
+    const dexConfig2 = DEX_ROUTERS.base[path2.dex];
+
     const swaps = [
         {
-            router: DEX_ROUTERS.base[path1.dex],
+            router: dexConfig1.router,
             from: loanTokenAddress,
             to: targetTokenAddress,
             dex: DEX_TYPES[path1.dex],
-            dexParams: path1.type === 'V3' ? defaultAbiCoder.encode(['bytes', 'uint256'], [path1.path, 0]) : defaultAbiCoder.encode(['uint256'], [0])
+            dexParams: getDexParams(path1, dexConfig1)
         },
         {
-            router: DEX_ROUTERS.base[path2.dex],
+            router: dexConfig2.router,
             from: targetTokenAddress,
             to: loanTokenAddress,
             dex: DEX_TYPES[path2.dex],
-            dexParams: path2.type === 'V3' ? defaultAbiCoder.encode(['bytes', 'uint256'], [path2.path, 0]) : defaultAbiCoder.encode(['uint256'], [0])
+            dexParams: getDexParams(path2, dexConfig2)
         }
     ];
 
@@ -82,7 +124,18 @@ async function findAndExecuteArbitrage(pair) {
 
     try {
         const gasPrice = await getDynamicGasPrice(provider, BOT_CONFIG.GAS_PRICE_STRATEGY);
-        const tx = await arbitrageContract.executeArbitrage(loanTokenAddress, loanAmount, swaps, { gasPrice });
+        
+        // Estimate gas
+        const estimatedGas = await arbitrageContract.executeArbitrage.estimateGas(
+            loanTokenAddress,
+            loanAmount,
+            swaps
+        );
+        
+        // Add a buffer
+        const gasLimit = BigInt(Math.round(Number(estimatedGas) * 1.2));
+
+        const tx = await arbitrageContract.executeArbitrage(loanTokenAddress, loanAmount, swaps, { gasPrice, gasLimit });
         const receipt = await tx.wait();
         console.log(`\nTRADE SUCCESSFUL:`);
         console.log(`- Tx Hash: ${receipt.transactionHash}`);
@@ -97,7 +150,6 @@ async function findAndExecuteArbitrage(pair) {
 
 async function run() {
     console.log('Arbitrage Bot Starting...');
-    console.log(`Wallet Address: ${wallet.address}`);
     console.log(`Watching for new blocks on ${activeNetwork}...\n`);
 
     broadcast({ type: 'status', data: { isOnline: true } });
@@ -107,8 +159,7 @@ async function run() {
         broadcast({ type: 'log', data: `Scanning Block: ${blockNumber}` });
 
         try {
-            const results = await Promise.all(ARBITRAGE_PAIRS.map(pair => findAndExecuteArbitrage(pair)));
-            // ... (rest of the run function)
+            await Promise.all(ARBITRAGE_PAIRS.map(pair => findAndExecuteArbitrage(pair)));
         } catch (error) {
             console.error(`\nError during block scan:`, error);
             broadcast({ type: 'log', data: `Error during block scan: ${error.message}` });

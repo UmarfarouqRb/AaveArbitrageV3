@@ -1,5 +1,6 @@
-const { ethers, getAddress } = require('ethers');
+const { ethers, getAddress, solidityPacked } = require('ethers');
 const { TOKENS, TOKEN_DECIMALS, DEX_QUOTERS, V3_FEE_TIERS, DEX_ROUTERS } = require('./config');
+const { getDexConfig, getProvider } = require('./utils');
 
 const IUniswapV3QuoterV2ABI = require('./abis/IUniswapV3QuoterV2.json');
 const IUniswapV2RouterABI = require('./abis/IUniswapV2Router.json');
@@ -15,20 +16,19 @@ async function findBestPath(tokenIn, tokenOut, amountIn, provider, dexWhitelist 
         return null;
     }
 
-    const tokenInDecimals = TOKEN_DECIMALS.base[tokenInSymbol];
-    const tokenOutDecimals = TOKEN_DECIMALS.base[tokenOutSymbol];
-
     let bestPath = {
         amountOut: 0n,
         dex: null,
         path: null,
         tokens: [],
-        type: null
+        type: null,
+        stable: false,
     };
 
     const pathPromises = [];
 
     for (const dex of dexWhitelist) {
+        const dexConfig = getDexConfig(dex);
         if (DEX_QUOTERS.base[dex]) { // V3-style DEXs
             pathPromises.push(findV3BestPath(dex, tokenIn, tokenOut, amountIn, provider));
         } else { // V2-style DEXs
@@ -51,21 +51,21 @@ async function findBestPath(tokenIn, tokenOut, amountIn, provider, dexWhitelist 
     return null;
 }
 
-
 async function findV3BestPath(dex, tokenIn, tokenOut, amountIn, provider) {
     const quoterAddress = DEX_QUOTERS.base[dex];
     const quoterContract = new ethers.Contract(quoterAddress, IUniswapV3QuoterV2ABI, provider);
     const feeTiers = V3_FEE_TIERS[dex];
 
-    let bestPath = { amountOut: 0n, dex, path: null, tokens: [], type: 'V3' };
+    let bestPath = { amountOut: 0n, dex, path: null, tokens: [], type: 'V3', stable: false };
 
     // 1. Check direct path
     for (const fee of feeTiers) {
         try {
-            const path = ethers.solidityPacked(['address', 'uint24', 'address'], [tokenIn, fee, tokenOut]);
-            const { amountOut } = await quoterContract.quoteExactInput.staticCall(path, amountIn);
+            const path = solidityPacked(['address', 'uint24', 'address'], [tokenIn, fee, tokenOut]);
+            const amountOut = await quoterContract.quoteExactInputSingle.staticCall(path, amountIn);
+
             if (amountOut > bestPath.amountOut) {
-                bestPath = { ...bestPath, amountOut, path, tokens: [tokenIn, tokenOut] };
+                bestPath = { ...bestPath, amountOut, path, tokens: [tokenIn, tokenOut], fee };
             }
         } catch (e) { /* Path doesn't exist, ignore */ }
     }
@@ -75,43 +75,47 @@ async function findV3BestPath(dex, tokenIn, tokenOut, amountIn, provider) {
          for (const fee1 of feeTiers) {
             for (const fee2 of feeTiers) {
                  try {
-                    const path = ethers.solidityPacked(
+                    const path = solidityPacked(
                         ['address', 'uint24', 'address', 'uint24', 'address'],
                         [tokenIn, fee1, TOKENS.base.WETH, fee2, tokenOut]
                     );
-                    const { amountOut } = await quoterContract.quoteExactInput.staticCall(path, amountIn);
+                    const amountOut = await quoterContract.quoteExactInput.staticCall(path, amountIn);
                     if (amountOut > bestPath.amountOut) {
-                        bestPath = { ...bestPath, amountOut, path, tokens: [tokenIn, TOKENS.base.WETH, tokenOut] };
+                        bestPath = { ...bestPath, amountOut, path, tokens: [tokenIn, TOKENS.base.WETH, tokenOut], fee: [fee1, fee2] };
                     }
                 } catch (e) { /* Path doesn't exist */ }
             }
         }
     }
-    
+
     return bestPath.amountOut > 0n ? bestPath : null;
 }
 
 async function findV2BestPath(dex, tokenIn, tokenOut, amountIn, provider) {
-    const routerAddress = DEX_ROUTERS.base[dex];
-    const routerContract = new ethers.Contract(routerAddress, IUniswapV2RouterABI, provider);
-    let bestPath = { amountOut: 0n, dex, path: null, tokens: [], type: 'V2' };
+    const dexConfig = getDexConfig(dex);
+    const routerContract = new ethers.Contract(dexConfig.router, IUniswapV2RouterABI, provider);
+
+    const stablecoins = [TOKENS.base.USDC, TOKENS.base.DAI].map(getAddress);
+    const isStablePair = stablecoins.includes(getAddress(tokenIn)) && stablecoins.includes(getAddress(tokenOut));
+
+    let bestPath = { amountOut: 0n, dex, path: null, tokens: [], type: 'V2', stable: isStablePair };
 
     // 1. Check direct path
     try {
-        const amounts = await routerContract.getAmountsOut.staticCall(amountIn, [tokenIn, tokenOut]);
-        const amountOut = amounts[amounts.length - 1];
+        const amounts = await routerContract.getAmountsOut(amountIn, [tokenIn, tokenOut]);
+        const amountOut = amounts[1];
         if (amountOut > bestPath.amountOut) {
-            bestPath = { ...bestPath, amountOut, tokens: [tokenIn, tokenOut] };
+            bestPath = { ...bestPath, amountOut, path: [tokenIn, tokenOut], tokens: [tokenIn, tokenOut] };
         }
     } catch (e) { /* Path doesn't exist, ignore */ }
 
     // 2. Check multi-hop path (via WETH)
     if (tokenIn !== TOKENS.base.WETH && tokenOut !== TOKENS.base.WETH) {
         try {
-            const amounts = await routerContract.getAmountsOut.staticCall(amountIn, [tokenIn, TOKENS.base.WETH, tokenOut]);
+            const amounts = await routerContract.getAmountsOut(amountIn, [tokenIn, TOKENS.base.WETH, tokenOut]);
             const amountOut = amounts[amounts.length - 1];
             if (amountOut > bestPath.amountOut) {
-                 bestPath = { ...bestPath, amountOut, tokens: [tokenIn, TOKENS.base.WETH, tokenOut] };
+                 bestPath = { ...bestPath, amountOut, path: [tokenIn, TOKENS.base.WETH, tokenOut], tokens: [tokenIn, TOKENS.base.WETH, tokenOut] };
             }
         } catch (e) { /* Path doesn't exist, ignore */ }
     }
@@ -151,7 +155,7 @@ async function getDynamicGasPrice(provider, strategy) {
 
 function getTokenSymbol(address, network = 'base') {
     for (const [symbol, tokenAddress] of Object.entries(TOKENS[network])) {
-        if (getAddress(address) === tokenAddress) {
+        if (getAddress(address) === getAddress(tokenAddress)) {
             return symbol;
         }
     }

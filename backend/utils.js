@@ -1,6 +1,6 @@
 
 const { JsonRpcProvider, Contract } = require('ethers');
-const { DEX_ROUTERS, DEX_FACTORIES } = require('./config'); // Import DEX configs
+const config = require('./config'); // Import the entire config object
 
 const ERC20_ABI = [
     "function decimals() external view returns (uint8)",
@@ -18,11 +18,10 @@ function getProvider(networkName, NETWORKS) {
     return providerCache[networkName];
 }
 
-// --- NEWLY ADDED FUNCTION ---
 function getDexConfig(dexName) {
-    const network = 'base'; // Assuming 'base' for now, this can be parameterized if needed
-    const router = DEX_ROUTERS[network][dexName];
-    const factory = DEX_FACTORIES[network][dexName]; // Factory might be needed later
+    const network = 'base'; // Assuming 'base' for now
+    const router = config.DEX_ROUTERS[network][dexName];
+    const factory = config.DEX_FACTORIES ? config.DEX_FACTORIES[network][dexName] : undefined;
 
     if (!router) {
         throw new Error(`Router for ${dexName} on network ${network} not found.`);
@@ -43,7 +42,6 @@ async function getTokenDetails(tokenAddress, provider) {
 async function getGasPrice(provider, strategy) {
     const feeData = await provider.getFeeData();
     if (!feeData.maxFeePerGas) {
-        // Fallback for non-EIP-1559 networks
         return feeData.gasPrice;
     }
 
@@ -57,7 +55,7 @@ async function getGasPrice(provider, strategy) {
 
 module.exports = {
     getProvider,
-    getDexConfig, // Export the new function
+    getDexConfig,
     getTokenDetails,
     getGasPrice,
 };
