@@ -1,0 +1,40 @@
+
+# Render deployment configuration for the FlashBot monorepo
+
+services:
+  # Frontend static web service
+  - type: web
+    name: frontend
+    env: static
+    # Set the root to the frontend directory
+    rootDir: ./frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    routes:
+      - path: /*
+        rewrite: /index.html
+
+  # Backend Node.js web service
+  - type: web
+    name: backend
+    env: node
+    plan: free
+    # Set the root to the backend directory
+    rootDir: ./backend
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/status
+    envVars:
+      # The blockchain network (e.g., sepolia, base)
+      - key: NETWORK
+        value: "base"
+      # The address of the deployed AaveArbitrageV3 smart contract
+      - key: ARBITRAGE_CONTRACT_ADDRESS
+        value: "0x7b2Af90c95A38016aB9e09926500A9A1ca915779"
+         # TODO: Replace with your actual contract address
+      # The RPC URL for the blockchain network
+      - key: RPC_URL
+        fromService:
+          type: external
+          name: "https://base-mainnet.g.alchemy.com/v2/_rq09Uz--vhSNI9x6BGOb"
+          key: url

@@ -5,18 +5,39 @@ const fs = require('fs');
 const path = require('path');
 const { fork } = require('child_process');
 const { simulateTrade } = require('./simulate-manual-trade');
-const { prepareTrade } = require('./prepare-manual-trade'); // Import the new module
+const { prepareTrade } = require('./prepare-manual-trade');
 
 const app = express();
 const port = process.env.PORT || 3001;
+const host = '0.0.0.0';
+
+// --- CORS Configuration ---
+// In production, we only want to allow requests from our deployed frontend.
+// We use an environment variable (FRONTEND_URL) to define the allowed origin.
+const allowedOrigins = ['http://localhost:5173']; // Allow localhost for development
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+};
+
+app.use(cors(corsOptions));
+app.use(express.json());
+
 const TRADE_HISTORY_FILE = path.join(__dirname, 'trade_history.json');
+const MANUAL_TRADE_HISTORY_FILE = path.join(__dirname, 'manual_trade_history.json');
 const BOT_LOG_FILE = path.join(__dirname, 'bot.log');
 
 // Create a writable stream for the bot's logs
 const logStream = fs.createWriteStream(BOT_LOG_FILE, { flags: 'a' });
-
-app.use(cors());
-app.use(express.json());
 
 // --- Bot Process Management ---
 console.log('Starting arbitrage bot...');
@@ -32,7 +53,6 @@ botProcess.stderr.pipe(logStream);
 
 botProcess.on('exit', (code) => {
     console.error(`Arbitrage bot exited with code ${code}. Restarting...`);
-    // You might want to add a delay or a maximum restart count here
     fork(path.join(__dirname, 'bot.js'));
 });
 
@@ -46,7 +66,7 @@ app.get('/api/logs', async (req, res) => {
     try {
         const data = await fs.promises.readFile(BOT_LOG_FILE, 'utf8');
         const lines = data.trim().split('\n');
-        res.json(lines.slice(-100)); // Return last 100 lines
+        res.json(lines.slice(-100));
     } catch (error) {
         if (error.code === 'ENOENT') {
             return res.json(['Log file not created yet.']);
@@ -69,10 +89,35 @@ app.get('/api/trade-history', async (req, res) => {
     }
 });
 
+app.get('/api/manual-trade-history', async (req, res) => {
+    try {
+        const data = await fs.promises.readFile(MANUAL_TRADE_HISTORY_FILE, 'utf8');
+        res.json(JSON.parse(data));
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            return res.json([]);
+        }
+        console.error('Error reading manual trade history:', error);
+        res.status(500).json({ message: 'Failed to read manual trade history.' });
+    }
+});
+
+app.post('/api/manual-trade-history', async (req, res) => {
+    try {
+        const newTrade = req.body;
+        const tradeHistory = JSON.parse(await fs.promises.readFile(MANUAL_TRADE_HISTORY_FILE, 'utf8'));
+        tradeHistory.push(newTrade);
+        await fs.promises.writeFile(MANUAL_TRADE_HISTORY_FILE, JSON.stringify(tradeHistory, null, 2));
+        res.json({ message: 'Trade saved successfully' });
+    } catch (error) {
+        console.error('Error saving manual trade:', error);
+        res.status(500).json({ message: 'Failed to save manual trade.' });
+    }
+});
+
 app.post('/api/simulate-trade', async (req, res) => {
     try {
         const tradeParams = req.body;
-        console.log("Simulating trade with params:", tradeParams);
         const result = await simulateTrade(tradeParams);
         res.json(result);
     } catch (error) {
@@ -81,29 +126,17 @@ app.post('/api/simulate-trade', async (req, res) => {
     }
 });
 
-// New endpoint for preparing the manual trade
 app.post('/api/prepare-manual-trade', async (req, res) => {
     try {
         const tradeParams = req.body;
-        console.log("Preparing manual trade with params:", tradeParams);
-
-        // First, simulate the trade to ensure it's profitable
-        const simulationResult = await simulateTrade(tradeParams);
-        if (!simulationResult.isProfitable) {
-            console.warn(`[SECURITY] Blocked unprofitable manual trade. Estimated Profit: ${simulationResult.estimatedProfit}`);
-            return res.status(400).json({ message: "Trade is not profitable. Preparation aborted." });
-        }
-
-        // If profitable, prepare the unsigned transaction
         const unsignedTx = await prepareTrade(tradeParams);
         res.json({ unsignedTx });
-
     } catch (error) {
         console.error('Trade Preparation Error:', error);
         res.status(500).json({ message: error.message || 'An unexpected error occurred during trade preparation.' });
     }
 });
 
-app.listen(port, () => {
-    console.log(`Backend server listening at http://localhost:${port}`);
+app.listen(port, host, () => {
+    console.log(`Backend server listening on ${host}:${port}`);
 });
