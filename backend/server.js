@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -7,6 +6,8 @@ const path = require('path');
 const { fork } = require('child_process');
 const { simulateTrade } = require('./simulate-manual-trade');
 const { prepareTrade } = require('./prepare-manual-trade');
+const { getProvider, getGasPrice } = require('./utils');
+const { NETWORKS } = require('./config');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -59,6 +60,18 @@ botProcess.on('exit', (code) => {
 
 app.get('/api/status', (req, res) => {
     res.json({ status: 'ok', message: 'Backend is running' });
+});
+
+app.get('/api/gas-price', async (req, res) => {
+    try {
+        const { network, strategy } = req.query;
+        const provider = getProvider(network, NETWORKS);
+        const gasPrice = await getGasPrice(provider, strategy);
+        res.json({ gasPrice: gasPrice.toString() });
+    } catch (error) {
+        console.error('Gas Price Error:', error);
+        res.status(500).json({ message: error.message || 'An unexpected error occurred while fetching gas price.' });
+    }
 });
 
 app.get('/api/logs', async (req, res) => {

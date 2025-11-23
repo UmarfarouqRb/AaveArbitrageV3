@@ -167,104 +167,96 @@ const ManualTrade = () => {
   const explorerBaseUrl = EXPLORER_URL[network] || 'https://basescan.org';
 
   return (
-    <div className="max-w-lg mx-auto bg-card-background p-4 sm:p-6 rounded-2xl border border-border-color">
-        <h2 className="text-xl font-bold mb-4 text-text-primary">Manual Arbitrage</h2>
+    <div id="manual-trade-container">
+        <h2 id="manual-trade-header">Manual Arbitrage</h2>
         
-        {/* Token Input Section */}
-        <div className="bg-background p-4 rounded-xl mb-2">
-            <label className="text-xs text-text-secondary">Loan Token</label>
+        <div id="token-input-section-a">
+            <label>Loan Token</label>
             <input 
                 type="text" 
                 value={tokenA}
                 onChange={(e) => setTokenA(e.target.value)} 
-                className="w-full bg-transparent text-2xl font-mono text-text-primary focus:outline-none"
             />
         </div>
 
-        <div className="bg-background p-4 rounded-xl mb-4">
-            <label className="text-xs text-text-secondary">Target Token</label>
+        <div id="token-input-section-b">
+            <label>Target Token</label>
             <input 
                 type="text" 
                 value={tokenB}
                 onChange={(e) => setTokenB(e.target.value)} 
-                className="w-full bg-transparent text-2xl font-mono text-text-primary focus:outline-none"
             />
         </div>
 
-        {/* Loan Amount */}
-        <div className="bg-background p-4 rounded-xl mb-4">
-            <label className="text-xs text-text-secondary">Loan Amount</label>
+        <div id="loan-amount-section">
+            <label>Loan Amount</label>
             <input 
                 type="text" 
                 value={loanAmount}
                 onChange={(e) => setLoanAmount(e.target.value)} 
-                className="w-full bg-transparent text-2xl font-mono text-text-primary focus:outline-none"
             />
         </div>
 
-        {/* DEX Selection */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="bg-background p-3 rounded-xl">
-                <label className="text-xs text-text-secondary">DEX 1</label>
-                <select value={dex1} onChange={handleDex1Change} className="w-full bg-transparent text-text-primary focus:outline-none">
-                    {DEX_OPTIONS.map(dex => <option key={dex} value={dex} className="bg-background">{dex}</option>)}
+        <div id="dex-selection-section">
+            <div>
+                <label>DEX 1</label>
+                <select value={dex1} onChange={handleDex1Change}>
+                    {DEX_OPTIONS.map(dex => <option key={dex} value={dex}>{dex}</option>)}
                 </select>
             </div>
-            <div className="bg-background p-3 rounded-xl">
-                <label className="text-xs text-text-secondary">DEX 2</label>
-                <select value={dex2} onChange={(e) => setDex2(e.target.value)} className="w-full bg-transparent text-text-primary focus:outline-none">
-                    {DEX_OPTIONS.map(dex => <option key={dex} value={dex} className="bg-background">{dex}</option>)}
+            <div>
+                <label>DEX 2</label>
+                <select value={dex2} onChange={(e) => setDex2(e.target.value)}>
+                    {DEX_OPTIONS.map(dex => <option key={dex} value={dex}>{dex}</option>)}
                 </select>
             </div>
         </div>
 
-        {/* Volatile Swap Checkbox */}
-        <div className="flex items-center justify-center mb-6">
+        <div id="volatile-swap-section">
             <input 
                 type="checkbox" 
                 id="volatile-swap" 
                 checked={!isStable} 
                 onChange={(e) => setIsStable(!e.target.checked)} 
-                className="h-4 w-4 rounded border-border-color text-primary-button-bg focus:ring-primary-button-bg"
             />
-            <label htmlFor="volatile-swap" className="ml-2 text-sm text-text-secondary">Volatile Swap</label>
+            <label htmlFor="volatile-swap">Volatile Swap</label>
         </div>
 
-        {/* Action Button */}
-        <button onClick={handleSimulate} disabled={simulating} className="w-full font-bold py-3 px-4 rounded-xl transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-lg bg-primary-button-bg text-primary-button-text hover:bg-primary-button-hover-bg">
+        <button onClick={handleSimulate} disabled={simulating} id="simulate-trade-button">
             {simulating ? 'Simulating...' : 'Simulate Trade'}
         </button>
 
-        {/* Simulation/Result Display */}
-        {simulationError && <p className="text-error-color mt-4 text-center">Simulation Error: {simulationError}</p>}
+        {simulationError && <p id="simulation-error">Simulation Error: {simulationError}</p>}
         
         {simulationResult && (
-            <div className="mt-6 p-4 bg-background rounded-xl">
-                <h3 className="font-bold text-lg text-text-primary mb-2">Simulation Result</h3>
-                <div className="space-y-2 text-sm">
-                    <div className="flex justify-between"><span className="text-text-secondary">Estimated Profit:</span> <span className={simulationResult.isProfitable ? 'text-success-color' : 'text-error-color'}>{simulationResult.estimatedProfit}</span></div>
-                    <div className="flex justify-between"><span className="text-text-secondary">Is Profitable:</span> <span className={simulationResult.isProfitable ? 'text-success-color' : 'text-error-color'}>{simulationResult.isProfitable ? 'Yes' : 'No'}</span></div>
-                    <div className="flex justify-between"><span className="text-text-secondary">Fee (DEX 1):</span> <span>{simulationResult.bestFee1}</span></div>
-                    <div className="flex justify-between"><span className="text-text-secondary">Fee (DEX 2):</span> <span>{simulationResult.bestFee2}</span></div>
+            <div id="simulation-result-container">
+                <h3>Simulation Result</h3>
+                <div>
+                    <div><span>Estimated Profit:</span> <span className={simulationResult.isProfitable ? 'text-success-color' : 'text-error-color'}>{simulationResult.estimatedProfit}</span></div>
+                    <div><span>Is Profitable:</span> <span className={simulationResult.isProfitable ? 'text-success-color' : 'text-error-color'}>{simulationResult.isProfitable ? 'Yes' : 'No'}</span></div>
+                    <div><span>Fee (DEX 1):</span> <span>{simulationResult.bestFee1}</span></div>
+                    <div><span>Fee (DEX 2):</span> <span>{simulationResult.bestFee2}</span></div>
                 </div>
                 {isTradeProfitable && (
-                    <button onClick={handleExecuteTrade} disabled={loading} className="w-full font-bold py-3 px-4 rounded-xl transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-lg bg-accent-bg text-accent-text hover:bg-accent-hover-bg mt-4">
+                    <button onClick={handleExecuteTrade} disabled={loading} id="execute-trade-button">
                         {loading ? 'Executing...' : 'Execute Trade'}
                     </button>
                 )}
             </div>
         )}
 
-        {error && <p className="text-error-color mt-4 text-center">Execution Error: {error}</p>}
+        {error && <p id="execution-error">Execution Error: {error}</p>}
         
         {result && (
-            <div className="mt-6 p-4 bg-background rounded-xl text-center">
-                <p className="font-bold text-lg">Status: {result.status}</p>
-                <a href={`${explorerBaseUrl}/tx/${result.txHash}`} target="_blank" rel="noopener noreferrer" className="text-primary-button-bg hover:underline mt-2 inline-block">View on Explorer</a>
+            <div id="result-container">
+                <p>Status: {result.status}</p>
+                <a href={`${explorerBaseUrl}/tx/${result.txH}`}>
+                    View on Explorer
+                </a>
             </div>
         )}
     </div>
-  );
+    );
 };
 
 export default ManualTrade;

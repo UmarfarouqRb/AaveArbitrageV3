@@ -3,14 +3,26 @@ import { Contract, isAddress } from 'ethers';
 import { usePrivy } from '@privy-io/react-auth';
 import { NetworkContext } from '../contexts/NetworkContext';
 import { arbitrageBalancerABI } from '../utils/abi';
+import { OWNER_ADDRESS } from '../constants';
+import { API_URL } from '../config';
 
 const OwnerSection = () => {
   const { user } = usePrivy();
-  const { networkConfig } = useContext(NetworkContext);
+  const { network, networkConfig } = useContext(NetworkContext);
 
   const [newOwner, setNewOwner] = useState('');
   const [withdrawToken, setWithdrawToken] = useState('');
   const [status, setStatus] = useState('');
+
+  if (!user || !user.wallet || user.wallet.address.toLowerCase() !== OWNER_ADDRESS.toLowerCase()) {
+    return null;
+  }
+
+  const getGasPrice = async (strategy) => {
+    const response = await fetch(`${API_URL}/gas-price?network=${network}&strategy=${strategy}`);
+    const data = await response.json();
+    return data.gasPrice;
+  };
 
   const getSignerAndContract = useCallback(async () => {
     const provider = await user.wallet.getEthersProvider();
@@ -22,27 +34,29 @@ const OwnerSection = () => {
     setStatus('Pausing contract...');
     try {
       const contract = await getSignerAndContract();
-      const tx = await contract.pause();
+      const gasPrice = await getGasPrice('fast');
+      const tx = await contract.pause({ gasPrice });
       await tx.wait();
       setStatus('Contract paused successfully.');
     } catch (error) {
       console.error("Error pausing contract:", error);
       setStatus(`Error: ${error.reason || error.message}`);
     }
-  }, [getSignerAndContract]);
+  }, [getSignerAndContract, network]);
 
   const handleUnpause = useCallback(async () => {
     setStatus('Unpausing contract...');
     try {
       const contract = await getSignerAndContract();
-      const tx = await contract.unpause();
+      const gasPrice = await getGasPrice('fast');
+      const tx = await contract.unpause({ gasPrice });
       await tx.wait();
       setStatus('Contract unpaused successfully.');
     } catch (error) {
       console.error("Error unpausing contract:", error);
       setStatus(`Error: ${error.reason || error.message}`);
     }
-  }, [getSignerAndContract]);
+  }, [getSignerAndContract, network]);
 
   const handleChangeOwner = useCallback(async () => {
     if (!isAddress(newOwner)) {
@@ -52,7 +66,8 @@ const OwnerSection = () => {
     setStatus('Transferring ownership...');
     try {
       const contract = await getSignerAndContract();
-      const tx = await contract.transferOwnership(newOwner);
+      const gasPrice = await getGasPrice('fast');
+      const tx = await contract.transferOwnership(newOwner, { gasPrice });
       await tx.wait();
       setStatus('Ownership transferred successfully.');
       setNewOwner('');
@@ -60,7 +75,7 @@ const OwnerSection = () => {
       console.error("Error transferring ownership:", error);
       setStatus(`Error: ${error.reason || error.message}`);
     }
-  }, [newOwner, getSignerAndContract]);
+  }, [newOwner, getSignerAndContract, network]);
 
   const handleWithdraw = useCallback(async () => {
     if (!isAddress(withdrawToken)) {
@@ -70,7 +85,8 @@ const OwnerSection = () => {
     setStatus('Withdrawing profits...');
     try {
       const contract = await getSignerAndContract();
-      const tx = await contract.withdraw(withdrawToken);
+      const gasPrice = await getGasPrice('aggressive');
+      const tx = await contract.withdraw(withdrawToken, { gasPrice });
       await tx.wait();
       setStatus('Profits withdrawn successfully.');
       setWithdrawToken('');
@@ -78,7 +94,7 @@ const OwnerSection = () => {
       console.error("Error withdrawing profits:", error);
       setStatus(`Error: ${error.reason || error.message}`);
     }
-  }, [withdrawToken, getSignerAndContract]);
+  }, [withdrawToken, getSignerAndContract, network]);
 
   return (
     <div>

@@ -12,9 +12,7 @@ const IArbitrageABI = AaveArbitrageV3Json.abi;
 const activeNetwork = 'base';
 const provider = new ethers.AlchemyProvider(activeNetwork, process.env.ALCHEMY_API_KEY);
 
-// --- Wallet Initialization with Debugging ---
-console.log('--- Private Key Diagnostic ---');
-console.log('Attempting to initialize wallet...');
+// --- Wallet Initialization ---
 if (!process.env.PRIVATE_KEY) {
     console.error('!!! FATAL: PRIVATE_KEY environment variable was not received by the bot process!');
     process.exit(1);
@@ -22,17 +20,13 @@ if (!process.env.PRIVATE_KEY) {
 
 let wallet;
 try {
-    // WARNING: The following line logs your private key. This is for debugging purposes ONLY.
-    console.log(`DEBUG: Private key loaded in bot: "${process.env.PRIVATE_KEY}"`);
     wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 } catch (error) {
     console.error('!!! CRITICAL ERROR: Failed to initialize wallet. The private key is invalid. !!!');
     console.error('Error details:', error.message);
     process.exit(1);
 }
-console.log('Wallet initialized successfully.');
 console.log(`Wallet Address: ${wallet.address}`);
-console.log('-----------------------------');
 
 
 const arbitrageContract = new ethers.Contract(BOT_CONFIG.ARBITRAGE_CONTRACT_ADDRESS, IArbitrageABI, wallet);

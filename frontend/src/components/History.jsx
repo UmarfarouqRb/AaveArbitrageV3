@@ -51,14 +51,14 @@ const TradeHistory = () => {
   };
 
   const renderHistoryTable = (title, history) => (
-    <div className="trade-history-section">
+    <div id="trade-history-section">
       <h3>{title}</h3>
       {history.length === 0 ? (
-        <div className="empty-state">
+        <div id="empty-state">
           <p>No trade history found.</p>
         </div>
       ) : (
-        <div className="table-responsive">
+        <div id="table-responsive">
           <table>
             <thead>
               <tr>
@@ -96,15 +96,15 @@ const TradeHistory = () => {
   );
 
   if (loading) {
-    return <div className="loading-message">Loading history...</div>;
+    return <div id="loading-message">Loading history...</div>;
   }
 
   if (error) {
-    return <div className="error-message">{error}</div>;
+    return <div id="error-message">{error}</div>;
   }
 
   return (
-    <div className="trade-history-container">
+    <div id="trade-history-container">
       {renderHistoryTable('Automated Bot Trade History', botHistory)}
       {renderHistoryTable('Manual Trade History', manualHistory)}
     </div>

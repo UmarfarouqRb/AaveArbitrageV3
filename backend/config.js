@@ -85,8 +85,8 @@ const LOAN_TOKENS = {
 };
 
 const LOAN_AMOUNTS = {
-    USDC: parseUnits('50000', TOKEN_DECIMALS.base.USDC), // 50,000 USDC
-    WETH: parseUnits('25', TOKEN_DECIMALS.base.WETH),       // 25 WETH
+    USDC: parseUnits('100', TOKEN_DECIMALS.base.USDC), // 100 USDC
+    WETH: parseUnits('0.1', TOKEN_DECIMALS.base.WETH),       // 0.1 WETH
 };
 
 

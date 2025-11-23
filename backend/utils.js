@@ -1,4 +1,3 @@
-
 const { JsonRpcProvider, Contract } = require('ethers');
 const config = require('./config'); // Import the entire config object
 
@@ -41,15 +40,14 @@ async function getTokenDetails(tokenAddress, provider) {
 
 async function getGasPrice(provider, strategy) {
     const feeData = await provider.getFeeData();
-    if (!feeData.maxFeePerGas) {
-        return feeData.gasPrice;
-    }
+    const gasPrice = feeData.gasPrice;
 
-    switch (strategy) {
-        case 'fast':
-            return feeData.maxFeePerGas * 12n / 10n;
-        default:
-            return feeData.maxFeePerGas;
+    if (strategy === 'fast') {
+        return gasPrice * 12n / 10n; // 20% markup
+    } else if (strategy === 'aggressive') {
+        return gasPrice * 15n / 10n; // 50% markup
+    } else {
+        return gasPrice;
     }
 }
 

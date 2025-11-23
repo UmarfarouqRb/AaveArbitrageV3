@@ -5,7 +5,7 @@ const { AAVE_ARBITRAGE_V3_ABI } = require('./abi.js');
 const ERC20_ABI = ["function decimals() external view returns (uint8)"];
 
 async function prepareTrade(tradeParams) {
-    const { network, tokenA, tokenB, dex1, dex2, loanAmount, userAddress, bestFee1, bestFee2 } = tradeParams;
+    const { network, tokenA, tokenB, dex1, dex2, loanAmount, userAddress, bestFee1, bestFee2, stable } = tradeParams;
 
     if (!userAddress) {
         throw new Error("User address is required to prepare a trade.");
@@ -20,9 +20,6 @@ async function prepareTrade(tradeParams) {
     const tokenAContract = new Contract(tokenA, ERC20_ABI, provider);
     const tokenADecimals = await tokenAContract.decimals();
     const loanAmountBigInt = parseUnits(loanAmount, tokenADecimals);
-
-    const stablecoins = [TOKENS.base.USDC, TOKENS.base.DAI].map(t => getAddress(t));
-    const isStableSwap = stablecoins.includes(getAddress(tokenA)) && stablecoins.includes(getAddress(tokenB));
 
     const defaultAbiCoder = new AbiCoder();
 
@@ -51,14 +48,14 @@ async function prepareTrade(tradeParams) {
             from: tokenA,
             to: tokenB,
             dex: DEX_TYPES[dex1],
-            dexParams: getDexParams(dex1, tokenA, tokenB, bestFee1, dexConfig1, isStableSwap)
+            dexParams: getDexParams(dex1, tokenA, tokenB, bestFee1, dexConfig1, stable)
         },
         {
             router: dexConfig2.router,
             from: tokenB,
             to: tokenA,
             dex: DEX_TYPES[dex2],
-            dexParams: getDexParams(dex2, tokenB, tokenA, bestFee2, dexConfig2, isStableSwap)
+            dexParams: getDexParams(dex2, tokenB, tokenA, bestFee2, dexConfig2, stable)
         }
     ];
 
