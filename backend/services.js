@@ -4,6 +4,8 @@ const { getDexConfig, getProvider } = require('./utils');
 
 const IUniswapV3QuoterV2ABI = require('./abis/IUniswapV3QuoterV2.json');
 const IUniswapV2RouterABI = require('./abis/IUniswapV2Router.json');
+const IUniswapV2FactoryABI = require('./abis/IUniswapV2Factory.json');
+const IUniswapV2PairABI = require('./abis/IUniswapV2Pair.json');
 
 // --- Path Finding Logic ---
 
@@ -28,7 +30,6 @@ async function findBestPath(tokenIn, tokenOut, amountIn, provider, dexWhitelist 
     const pathPromises = [];
 
     for (const dex of dexWhitelist) {
-        const dexConfig = getDexConfig(dex);
         if (DEX_QUOTERS.base[dex]) { // V3-style DEXs
             pathPromises.push(findV3BestPath(dex, tokenIn, tokenOut, amountIn, provider));
         } else { // V2-style DEXs
@@ -92,37 +93,74 @@ async function findV3BestPath(dex, tokenIn, tokenOut, amountIn, provider) {
 }
 
 async function findV2BestPath(dex, tokenIn, tokenOut, amountIn, provider) {
-    const dexConfig = getDexConfig(dex);
-    const routerContract = new ethers.Contract(dexConfig.router, IUniswapV2RouterABI, provider);
+    const dexConfig = DEX_ROUTERS.base[dex];
 
-    const stablecoins = [TOKENS.base.USDC, TOKENS.base.DAI].map(getAddress);
-    const isStablePair = stablecoins.includes(getAddress(tokenIn)) && stablecoins.includes(getAddress(tokenOut));
+    let bestPath = { amountOut: 0n, dex, path: [], tokens: [], type: 'V2', stable: false };
 
-    let bestPath = { amountOut: 0n, dex, path: null, tokens: [], type: 'V2', stable: isStablePair };
+    const factories = Object.entries(dexConfig.factories || {}).map(([type, address]) => ({ type, address, isStable: type === 'stable' }));
 
-    // 1. Check direct path
-    try {
-        const amounts = await routerContract.getAmountsOut(amountIn, [tokenIn, tokenOut]);
-        const amountOut = amounts[1];
-        if (amountOut > bestPath.amountOut) {
-            bestPath = { ...bestPath, amountOut, path: [tokenIn, tokenOut], tokens: [tokenIn, tokenOut] };
-        }
-    } catch (e) { /* Path doesn't exist, ignore */ }
+    // Add a synthetic factory for DEXs without explicit factory types
+    if (factories.length === 0 && dexConfig.factory) {
+        factories.push({ type: 'volatile', address: dexConfig.factory, isStable: false });
+    }
 
-    // 2. Check multi-hop path (via WETH)
-    if (tokenIn !== TOKENS.base.WETH && tokenOut !== TOKENS.base.WETH) {
+    for (const factoryConfig of factories) {
+        const factoryContract = new ethers.Contract(factoryConfig.address, IUniswapV2FactoryABI, provider);
+
+        // 1. Check direct path
+        let currentBestAmount = bestPath.amountOut;
         try {
-            const amounts = await routerContract.getAmountsOut(amountIn, [tokenIn, TOKENS.base.WETH, tokenOut]);
-            const amountOut = amounts[amounts.length - 1];
-            if (amountOut > bestPath.amountOut) {
-                 bestPath = { ...bestPath, amountOut, path: [tokenIn, TOKENS.base.WETH, tokenOut], tokens: [tokenIn, TOKENS.base.WETH, tokenOut] };
+            const pairAddress = await factoryContract.getPair(tokenIn, tokenOut);
+            if (pairAddress !== ethers.ZeroAddress) {
+                const pairContract = new ethers.Contract(pairAddress, IUniswapV2PairABI, provider);
+                const reserves = await pairContract.getReserves();
+                const [reserveIn, reserveOut] = tokenIn.toLowerCase() < tokenOut.toLowerCase() ? [reserves[0], reserves[1]] : [reserves[1], reserves[0]];
+                const amountOut = getAmountOut(amountIn, reserveIn, reserveOut);
+
+                if (amountOut > currentBestAmount) {
+                    bestPath = { amountOut, dex, path: [tokenIn, tokenOut], tokens: [tokenIn, tokenOut], type: 'V2', stable: factoryConfig.isStable };
+                    currentBestAmount = amountOut;
+                }
             }
-        } catch (e) { /* Path doesn't exist, ignore */ }
+        } catch (e) { /* Path doesn't exist */ }
+
+        // 2. Check multi-hop path (via WETH)
+        if (tokenIn !== TOKENS.base.WETH && tokenOut !== TOKENS.base.WETH) {
+            try {
+                // In -> WETH
+                const pair1Address = await factoryContract.getPair(tokenIn, TOKENS.base.WETH);
+                if (pair1Address !== ethers.ZeroAddress) {
+                    const pair1Contract = new ethers.Contract(pair1Address, IUniswapV2PairABI, provider);
+                    const reserves1 = await pair1Contract.getReserves();
+                    const [reserveIn1, reserveOut1] = tokenIn.toLowerCase() < TOKENS.base.WETH.toLowerCase() ? [reserves1[0], reserves1[1]] : [reserves1[1], reserves1[0]];
+                    const amountOut1 = getAmountOut(amountIn, reserveIn1, reserveOut1);
+
+                    // WETH -> Out
+                    const pair2Address = await factoryContract.getPair(TOKENS.base.WETH, tokenOut);
+                    if (pair2Address !== ethers.ZeroAddress) {
+                        const pair2Contract = new ethers.Contract(pair2Address, IUniswapV2PairABI, provider);
+                        const reserves2 = await pair2Contract.getReserves();
+                        const [reserveIn2, reserveOut2] = TOKENS.base.WETH.toLowerCase() < tokenOut.toLowerCase() ? [reserves2[0], reserves2[1]] : [reserves2[1], reserves2[0]];
+                        const amountOut2 = getAmountOut(amountOut1, reserveIn2, reserveOut2);
+
+                        if (amountOut2 > currentBestAmount) {
+                            bestPath = { amountOut: amountOut2, dex, path: [tokenIn, TOKENS.base.WETH, tokenOut], tokens: [tokenIn, TOKENS.base.WETH, tokenOut], type: 'V2', stable: factoryConfig.isStable };
+                        }
+                    }
+                }
+            } catch (e) { /* Path doesn't exist */ }
+        }
     }
 
     return bestPath.amountOut > 0n ? bestPath : null;
 }
 
+function getAmountOut(amountIn, reserveIn, reserveOut) {
+    const amountInWithFee = amountIn * 997n; // Uniswap V2 fee is 0.3%
+    const numerator = amountInWithFee * reserveOut;
+    const denominator = (reserveIn * 1000n) + amountInWithFee;
+    return numerator / denominator;
+}
 
 // --- Gas Price Logic ---
 

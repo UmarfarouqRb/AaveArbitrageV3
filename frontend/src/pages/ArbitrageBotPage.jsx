@@ -1,17 +1,17 @@
-
 import React, { useState, useEffect } from 'react';
 import ArbitrageBotController from '../components/ArbitrageBotController';
 import BotLogs from '../components/BotLogs';
 import TradeHistory from '../components/TradeHistory';
+import TokenDisplay from '../components/TokenDisplay';
 
 const ArbitrageBotPage = () => {
   const [status, setStatus] = useState('Connecting...');
   const [logs, setLogs] = useState([]);
   const [trades, setTrades] = useState([]);
+  const [currentToken, setCurrentToken] = useState(null);
+  const [currentAmount, setCurrentAmount] = useState(null);
 
   useEffect(() => {
-    // Use window.location.host to dynamically determine the WebSocket URL
-    // This works for both local development and deployed environments like Render
     const wsUrl = `ws://${window.location.host}`;
     const ws = new WebSocket(wsUrl);
 
@@ -31,6 +31,8 @@ const ArbitrageBotPage = () => {
           break;
         case 'trade':
           setTrades(prev => [message.data, ...prev]);
+          setCurrentToken(message.data.token);
+          setCurrentAmount(message.data.amount);
           break;
         default:
           break;
@@ -47,11 +49,10 @@ const ArbitrageBotPage = () => {
         setLogs(prev => [...prev, `WebSocket Error: ${error.message}`]);
     }
 
-    // Clean up the connection when the component unmounts
     return () => {
       ws.close();
     };
-  }, []); // Empty dependency array ensures this runs only once
+  }, []);
 
   return (
     <div className="arbitrage-bot-container">
@@ -62,6 +63,7 @@ const ArbitrageBotPage = () => {
         </p>
       </div>
       <ArbitrageBotController status={status} />
+      {currentToken && currentAmount && <TokenDisplay token={currentToken} amount={currentAmount} />}
       <BotLogs logs={logs} />
       <TradeHistory trades={trades} />
     </div>

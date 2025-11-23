@@ -1,4 +1,3 @@
-
 const { getAddress, parseUnits } = require('ethers');
 
 // --- Network Configuration ---
@@ -48,8 +47,10 @@ const DEX_ROUTERS = {
     base: {
         'Aerodrome': {
             router: getAddress('0xcf77a3ba9a5ca399b7c97c74d54e5b1beb874e43'),
-            factory: getAddress('0x420dd381b31aef6683db6b902084cb0ffcec40da'),
-            stable: false, // Default to volatile
+            factories: {
+                volatile: getAddress('0x420dd381b31aef6683db6b902084cb0ffcec40da'),
+                stable: getAddress('0x0c9c34a26b489a8c9b9f9a463973a1c38d338e0d'),
+            }
         },
         'PancakeV3': {
             router: getAddress('0x678aa4bf4e210cf2166753e054d5b7c31cc7fa86'),
