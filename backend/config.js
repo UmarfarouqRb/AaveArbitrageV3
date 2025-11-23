@@ -31,6 +31,7 @@ const TOKENS = {
         SEAM: getAddress('0x1c7a460413dd4e964f96d8dfc56e7223ce82cf0a'),
         TN100X: getAddress('0x554c9251a3501f65523f22144d13374b43aa9d6b'),
         NORMIE: getAddress('0x7f12d13b34f5f4f0a9449c16bcd42f0da47af200'),
+        JESSE: getAddress('0x0765425b334d7db1f3ca6c07887552a9252a8183'),
     }
 };
 
@@ -38,7 +39,7 @@ const TOKEN_DECIMALS = {
     base: {
         WETH: 18, USDC: 6, cbBTC: 8, DAI: 18, DEGEN: 18, BRETT: 18, AERO: 18, cbETH: 18,
         HIGHER: 18, FRIEND: 18, MFER: 18, TOSHI: 18, DOGINME: 18, TYBG: 18, BALD: 18,
-        SEAM: 18, TN100X: 18, NORMIE: 18,
+        SEAM: 18, TN100X: 18, NORMIE: 18, JESSE: 18,
     }
 };
 
@@ -85,8 +86,20 @@ const LOAN_TOKENS = {
 };
 
 const LOAN_AMOUNTS = {
-    USDC: parseUnits('100', TOKEN_DECIMALS.base.USDC), // 100 USDC
-    WETH: parseUnits('0.1', TOKEN_DECIMALS.base.WETH),       // 0.1 WETH
+    USDC: [
+        parseUnits('10', TOKEN_DECIMALS.base.USDC),
+        parseUnits('25', TOKEN_DECIMALS.base.USDC),
+        parseUnits('50', TOKEN_DECIMALS.base.USDC),
+        parseUnits('100', TOKEN_DECIMALS.base.USDC),
+        parseUnits('250', TOKEN_DECIMALS.base.USDC),
+        parseUnits('500', TOKEN_DECIMALS.base.USDC)
+    ],
+    WETH: [
+        parseUnits('0.05', TOKEN_DECIMALS.base.WETH),
+        parseUnits('0.1', TOKEN_DECIMALS.base.WETH),
+        parseUnits('0.25', TOKEN_DECIMALS.base.WETH),
+        parseUnits('0.5', TOKEN_DECIMALS.base.WETH)
+    ]
 };
 
 
@@ -107,6 +120,7 @@ const BOT_CONFIG = {
     GAS_LIMIT: '1000000',
     AAVE_FLASH_LOAN_FEE: 0.0009, // 0.09%
     ESTIMATED_GAS_COST_ETH: '0', // Estimated gas cost in ETH
+    SLIPPAGE_TOLERANCE: 0.005, // 0.5% slippage tolerance
 };
 
 module.exports = {

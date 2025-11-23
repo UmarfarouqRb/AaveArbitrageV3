@@ -1,7 +1,7 @@
 
 const path = require('path');
 const { ethers, formatUnits, getAddress, AbiCoder } = require('ethers');
-const { NETWORKS, TOKENS, TOKEN_DECIMALS, ARBITRAGE_PAIRS, LOAN_AMOUNTS, DEX_TYPES, BOT_CONFIG, DEX_ROUTERS } = require('./config');
+const { NETWORKS, TOKENS, TOKEN_DECIMALS, ARBITRAGE_PAIRS, LOAN_TOKENS, LOAN_AMOUNTS, DEX_TYPES, BOT_CONFIG, DEX_ROUTERS } = require('./config');
 const { findBestPath, getDynamicGasPrice } = require('./services');
 const WebSocket = require('ws');
 
@@ -47,10 +47,9 @@ function broadcast(message) {
 
 // --- Main Logic ---
 
-async function findAndExecuteArbitrage(pair) {
+async function findAndExecuteArbitrage(pair, loanAmount) {
     const [loanTokenAddress, targetTokenAddress] = pair;
-    const loanTokenSymbol = Object.keys(LOAN_AMOUNTS).find(key => getAddress(TOKENS.base[key]) === getAddress(loanTokenAddress));
-    const loanAmount = LOAN_AMOUNTS[loanTokenSymbol];
+    const loanTokenSymbol = Object.keys(LOAN_TOKENS).find(key => getAddress(TOKENS.base[key]) === getAddress(loanTokenAddress));
 
     // 1. Find best path for Loan Token -> Target Token
     const path1 = await findBestPath(loanTokenAddress, targetTokenAddress, loanAmount, provider);
@@ -61,7 +60,9 @@ async function findAndExecuteArbitrage(pair) {
     if (!path2) return { status: 'NO_OPPORTUNITY' };
 
     // 3. Calculate Profitability
-    const netProfit = path2.amountOut - loanAmount; // Simplified calculation
+    const amountOutMin1 = path1.amountOut * BigInt(Math.round((1 - BOT_CONFIG.SLIPPAGE_TOLERANCE) * 10000)) / 10000n; // BigInt division
+    const amountOutMin2 = path2.amountOut * BigInt(Math.round((1 - BOT_CONFIG.SLIPPAGE_TOLERANCE) * 10000)) / 10000n;
+    const netProfit = amountOutMin2 - loanAmount; // Simplified calculation
     const minProfit = ethers.parseUnits(BOT_CONFIG.MIN_PROFIT_THRESHOLD_ETH, TOKEN_DECIMALS.base[loanTokenSymbol]);
 
     const data = `Net profit: ${formatUnits(netProfit, TOKEN_DECIMALS.base[loanTokenSymbol])} ${loanTokenSymbol}`;
@@ -70,20 +71,20 @@ async function findAndExecuteArbitrage(pair) {
     if (netProfit <= minProfit) return { status: 'NO_OPPORTUNITY' };
 
     // 4. Construct Swaps
-    const getDexParams = (path, dexConfig) => {
+    const getDexParams = (path, dexConfig, amountOutMin) => {
         const dexType = DEX_TYPES[path.dex];
         const defaultAbiCoder = new AbiCoder();
 
         if (dexType === 1 || dexType === 2) { // V3 DEXs
-            return defaultAbiCoder.encode(['bytes', 'uint256'], [path.path, 0]);
+            return defaultAbiCoder.encode(['bytes', 'uint256'], [path.path, amountOutMin]);
         } else if (dexType === 0) { // V2 DEX
             const factory = dexConfig.factory;
             if (!factory) {
                 throw new Error(`Factory address for ${path.dex} is not configured.`);
             }
-            return defaultAbiCoder.encode(['bool', 'address', 'uint256'], [path.stable, factory, 0]);
+            return defaultAbiCoder.encode(['bool', 'address', 'uint256'], [path.stable, factory, amountOutMin]);
         } else {
-            return defaultAbiCoder.encode(['uint256'], [0]);
+            return defaultAbiCoder.encode(['uint256'], [amountOutMin]);
         }
     };
 
@@ -96,14 +97,14 @@ async function findAndExecuteArbitrage(pair) {
             from: loanTokenAddress,
             to: targetTokenAddress,
             dex: DEX_TYPES[path1.dex],
-            dexParams: getDexParams(path1, dexConfig1)
+            dexParams: getDexParams(path1, dexConfig1, amountOutMin1)
         },
         {
             router: dexConfig2.router,
             from: targetTokenAddress,
             to: loanTokenAddress,
             dex: DEX_TYPES[path2.dex],
-            dexParams: getDexParams(path2, dexConfig2)
+            dexParams: getDexParams(path2, dexConfig2, amountOutMin2)
         }
     ];
 
@@ -153,7 +154,19 @@ async function run() {
         broadcast({ type: 'log', data: `Scanning Block: ${blockNumber}` });
 
         try {
-            await Promise.all(ARBITRAGE_PAIRS.map(pair => findAndExecuteArbitrage(pair)));
+            const allPromises = [];
+            for (const pair of ARBITRAGE_PAIRS) {
+                const [loanTokenAddress] = pair;
+                const loanTokenSymbol = Object.keys(LOAN_TOKENS).find(key => getAddress(LOAN_TOKENS[key]) === getAddress(loanTokenAddress));
+                const loanAmountsForToken = LOAN_AMOUNTS[loanTokenSymbol];
+
+                if (loanAmountsForToken && Array.isArray(loanAmountsForToken)) {
+                    for (const loanAmount of loanAmountsForToken) {
+                        allPromises.push(findAndExecuteArbitrage(pair, loanAmount));
+                    }
+                }
+            }
+            await Promise.all(allPromises);
         } catch (error) {
             console.error(`\nError during block scan:`, error);
             broadcast({ type: 'log', data: `Error during block scan: ${error.message}` });
