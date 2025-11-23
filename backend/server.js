@@ -4,8 +4,8 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const { fork } = require('child_process');
-const { simulateTrade } = require('./simulate-manual-trade');
-const { prepareTrade } = require('./prepare-manual-trade');
+const { prepareTrade } = require('./prepare-trade');
+const { simulateTrade } = require('./simulate-trade');
 const { getProvider, getGasPrice } = require('./utils');
 const { NETWORKS } = require('./config');
 
