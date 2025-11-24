@@ -75,15 +75,12 @@ async function findAndExecuteArbitrage(pair, loanAmount) {
         const dexType = DEX_TYPES[path.dex];
         const defaultAbiCoder = new AbiCoder();
 
-        if (dexType === 1 || dexType === 2) { // V3 DEXs
+        if (dexType === 1 || dexType === 2) { // V3 DEXs (PancakeV3, UniswapV3)
             return defaultAbiCoder.encode(['bytes', 'uint256'], [path.path, amountOutMin]);
-        } else if (dexType === 0) { // V2 DEX
-            const factory = dexConfig.factory;
-            if (!factory) {
-                throw new Error(`Factory address for ${path.dex} is not configured.`);
-            }
-            return defaultAbiCoder.encode(['bool', 'address', 'uint256'], [path.stable, factory, amountOutMin]);
-        } else {
+        } else { // V2 DEXs (Aerodrome)
+            // The current contract expects dexParams to be abi.decode(encodedParams, (AerodromeParams))
+            // struct AerodromeParams { uint amountOutMin; }
+            // Therefore, we only encode the amountOutMin.
             return defaultAbiCoder.encode(['uint256'], [amountOutMin]);
         }
     };

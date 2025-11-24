@@ -188,6 +188,63 @@ async function getDynamicGasPrice(provider, strategy) {
     return BigInt(Math.round(gasPriceInWei));
 }
 
+async function getOptimalLoanAmount(tokenA, tokenB, dex1, dex2, provider) {
+    let optimalLoanAmount = 0n;
+    let maxProfit = -Infinity;
+    const tokenADecimals = TOKEN_DECIMALS.base[getTokenSymbol(tokenA)] ?? 18;
+
+    // Define a set of loan amounts to test
+    const testAmounts = [
+        ethers.parseUnits('1', tokenADecimals),
+        ethers.parseUnits('10', tokenADecimals),
+        ethers.parseUnits('100', tokenADecimals),
+        ethers.parseUnits('500', tokenADecimals),
+        ethers.parseUnits('1000', tokenADecimals),
+        ethers.parseUnits('5000', tokenADecimals),
+    ];
+
+    console.log(`Finding optimal loan for ${getTokenSymbol(tokenA)} -> ${getTokenSymbol(tokenB)} on ${dex1} -> ${dex2}`);
+
+    for (const amount of testAmounts) {
+        try {
+            const path1 = await findBestPath(tokenA, tokenB, amount, provider, [dex1]);
+            if (!path1 || path1.amountOut === 0n) continue;
+
+            const path2 = await findBestPath(tokenB, tokenA, path1.amountOut, provider, [dex2]);
+            if (!path2 || path2.amountOut === 0n) continue;
+
+            const profit = path2.amountOut - amount;
+
+            if (profit > maxProfit) {
+                maxProfit = profit;
+                optimalLoanAmount = amount;
+            }
+        } catch (error) {
+            console.error(`Error calculating profit for amount ${ethers.formatUnits(amount, tokenADecimals)}:`, error);
+        }
+    }
+
+    if (maxProfit > 0) {
+        console.log(`  > Optimal loan found: ${ethers.formatUnits(optimalLoanAmount, tokenADecimals)} ${getTokenSymbol(tokenA)} | Est. Profit: ${ethers.formatUnits(maxProfit, tokenADecimals)} ${getTokenSymbol(tokenA)}`);
+        return optimalLoanAmount;
+    } else {
+        console.log("  > No profitable opportunities found in test amounts.");
+        return 0n;
+    }
+}
+
+function encodeV3Path(path, fees) {
+    if (!Array.isArray(fees)) {
+        return solidityPacked(['address', 'uint24', 'address'], [path[0], fees, path[1]]);
+    }
+
+    let encoded = solidityPacked(['address', 'uint24', 'address'], [path[0], fees[0], path[1]]);
+    for (let i = 1; i < fees.length; i++) {
+        encoded += solidityPacked(['uint24', 'address'], [fees[i], path[i+1]]).substring(2);
+    }
+    return encoded;
+}
+
 
 // --- Utility ---
 
@@ -204,4 +261,8 @@ function getTokenSymbol(address, network = 'base') {
 module.exports = {
     findBestPath,
     getDynamicGasPrice,
+    getOptimalLoanAmount,
+    encodeV3Path,
+    findV2BestPath,
+    findV3BestPath,
 };
