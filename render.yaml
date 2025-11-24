@@ -17,6 +17,8 @@ services:
       - key: VITE_API_URL
         # The value is the URL of the backend service. Render automatically creates this URL.
         value: https://backend.onrender.com 
+      - key: VITE_PRIVY_APP_ID
+        value: "YOUR_PRIVY_APP_ID_HERE" # TODO: Replace with your actual Privy App ID
 
   # Backend Node.js web service
   - type: web
