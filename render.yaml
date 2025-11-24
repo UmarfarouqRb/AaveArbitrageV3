@@ -13,6 +13,10 @@ services:
     routes:
       - path: /*
         rewrite: /index.html
+    envVars:
+      - key: VITE_API_URL
+        # The value is the URL of the backend service. Render automatically creates this URL.
+        value: https://backend.onrender.com 
 
   # Backend Node.js web service
   - type: web
@@ -31,10 +35,6 @@ services:
       # The address of the deployed AaveArbitrageV3 smart contract
       - key: ARBITRAGE_CONTRACT_ADDRESS
         value: "0x7b2Af90c95A38016aB9e09926500A9A1ca915779"
-         # TODO: Replace with your actual contract address
       # The RPC URL for the blockchain network
       - key: RPC_URL
-        fromService:
-          type: external
-          name: "https://base-mainnet.g.alchemy.com/v2/_rq09Uz--vhSNI9x6BGOb"
-          key: url
+        value: "https://base-mainnet.g.alchemy.com/v2/_rq09Uz--vhSNI9x6BGOb"
