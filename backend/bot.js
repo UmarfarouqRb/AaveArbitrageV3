@@ -147,7 +147,7 @@ async function run() {
     broadcast({ type: 'status', data: { isOnline: true } });
 
     provider.on('block', async (blockNumber) => {
-        process.stdout.write(`Scanning Block: ${blockNumber} \r`);
+        console.log(`Scanning Block: ${blockNumber}`);
         broadcast({ type: 'log', data: `Scanning Block: ${blockNumber}` });
 
         try {

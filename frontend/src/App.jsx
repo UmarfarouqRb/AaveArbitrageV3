@@ -4,6 +4,7 @@ import { usePrivy } from '@privy-io/react-auth';
 import './components.css';
 import ErrorBoundary from './components/ErrorBoundary';
 import TopNav from './components/TopNav';
+import SideNav from './components/SideNav';
 import LoginPagePrompt from './components/LoginPagePrompt';
 
 // Lazy load the pages
@@ -14,11 +15,26 @@ const HistoryPage = lazy(() => import('./pages/HistoryPage'));
 const App = () => {
   const { login, logout, ready, authenticated } = usePrivy();
 
+  // A wrapper for the authenticated user's view
+  const AuthenticatedLayout = () => (
+    <div className="container">
+        <SideNav />
+        <main>
+            <TopNav />
+            <Suspense fallback={<div className="loading-container"><h2>Loading...</h2></div>}>
+              <Routes>
+                <Route path="/" element={<ManualTradePage />} />
+                <Route path="/arbitrage-bot" element={<ArbitrageBotPage />} />
+                <Route path="/history" element={<HistoryPage />} />
+              </Routes>
+            </Suspense>
+        </main>
+    </div>
+  );
+
   return (
     <Router>
-      {/* Main container with dark background */}
       <div id="app-container">
-        {/* Header section */}
         <header>
           <h1>
             <Link to="/">FlashBot</Link>
@@ -31,32 +47,15 @@ const App = () => {
             )}
           </div>
         </header>
-        
-        {/* Navigation and main content area */}
-        <div className="container">
-          <TopNav />
-          <main>
-            <Suspense fallback={<div className="loading-container"><h2>Loading...</h2></div>}>
-              <Routes>
-                <Route path="/" element={
-                  <ErrorBoundary>
-                    {ready && authenticated ? <ManualTradePage /> : <LoginPagePrompt />}
-                  </ErrorBoundary>
-                } />
-                  <Route path="/arbitrage-bot" element={
-                  <ErrorBoundary>
-                    {ready && authenticated ? <ArbitrageBotPage /> : <LoginPagePrompt />}
-                  </ErrorBoundary>
-                } />
-                <Route path="/history" element={
-                    <ErrorBoundary>
-                        {ready && authenticated ? <HistoryPage /> : <LoginPagePrompt />}
-                    </ErrorBoundary>
-                } />
-              </Routes>
-            </Suspense>
-          </main>
-        </div>
+
+        <ErrorBoundary>
+          {ready ? (
+            authenticated ? <AuthenticatedLayout /> : <LoginPagePrompt />
+          ) : (
+            <div className="loading-container"><h2>Loading Authentication...</h2></div>
+          )}
+        </ErrorBoundary>
+
       </div>
     </Router>
   );
