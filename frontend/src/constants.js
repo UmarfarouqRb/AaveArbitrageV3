@@ -26,8 +26,8 @@ export const TOKENS = {
         BALD: '0x27d2decb4a5353dc9f39075e55104935f7956b62',
         SEAM: '0x1c7a460413dd4e964f96d8dfc56e7223ce82cf0a',
         TN100X: '0x554c9251a3501f65523f22144d13374b43aa9d6b',
-'        NORMIE: '0x7f12d13b34f5f4f0a9449c16bcd42f0da47af200',
-        JESSE: '0x0765425b334d7db1f3ca6c07887552a9252a8183',
+        NORMIE: '0x7f12d13b34f5f4f0a9449c16bcd42f0da47af200',
+        JESSE: '0x0765425b334d7db1f3ca6c07887552a9252a8183'
     }
 };
 
