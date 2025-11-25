@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { usePrivy } from '@privy-io/react-auth';
 import './index.css';
 import ErrorBoundary from './components/ErrorBoundary';
