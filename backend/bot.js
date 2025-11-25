@@ -8,6 +8,7 @@ const IArbitrageABI = AAVE_ARBITRAGE_V3_ABI;
 // --- Globals ---
 const activeNetwork = 'base';
 const provider = new ethers.AlchemyProvider(activeNetwork, process.env.ALCHEMY_API_KEY);
+let whitelistedDEXs = []; // To store the list of approved DEXs
 
 // --- Wallet Initialization ---
 if (!process.env.PRIVATE_KEY) {
@@ -46,10 +47,11 @@ async function findAndExecuteArbitrage(pair, loanAmount) {
     const [loanTokenAddress, targetTokenAddress] = pair;
     const loanTokenSymbol = Object.keys(LOAN_TOKENS).find(key => getAddress(TOKENS.base[key]) === getAddress(loanTokenAddress));
 
-    const path1 = await findBestPath(loanTokenAddress, targetTokenAddress, loanAmount, provider);
+    // Only search on whitelisted DEXs
+    const path1 = await findBestPath(loanTokenAddress, targetTokenAddress, loanAmount, provider, whitelistedDEXs);
     if (!path1) return { status: 'NO_PATH' };
 
-    const path2 = await findBestPath(targetTokenAddress, loanTokenAddress, path1.amountOut, provider);
+    const path2 = await findBestPath(targetTokenAddress, loanTokenAddress, path1.amountOut, provider, whitelistedDEXs);
     if (!path2) return { status: 'NO_PATH' };
 
     const amountOutMin1 = path1.amountOut * BigInt(Math.round((1 - BOT_CONFIG.SLIPPAGE_TOLERANCE) * 10000)) / 10000n;
@@ -57,16 +59,17 @@ async function findAndExecuteArbitrage(pair, loanAmount) {
     const netProfit = amountOutMin2 - loanAmount;
     const minProfitThreshold = ethers.parseUnits(BOT_CONFIG.MIN_PROFIT_THRESHOLD_ETH, TOKEN_DECIMALS.base[loanTokenSymbol]);
 
-    if (netProfit <= minProfitThreshold) {
-        return { status: 'PROFIT_TOO_LOW' };
-    }
-    
     const opportunityPayload = {
         loanToken: loanTokenSymbol,
         loanAmount: formatUnits(loanAmount, TOKEN_DECIMALS.base[loanTokenSymbol]),
         path: `${path1.dex} -> ${path2.dex}`,
         estimatedProfit: formatUnits(netProfit, TOKEN_DECIMALS.base[loanTokenSymbol]),
     };
+
+    if (netProfit <= minProfitThreshold) {
+        log('INFO', 'PROFIT_TOO_LOW', `Opportunity found but profit is below threshold. Est. Profit: ${opportunityPayload.estimatedProfit} ${opportunityPayload.loanToken}`, opportunityPayload);
+        return { status: 'PROFIT_TOO_LOW' };
+    }
 
     log('OPPORTUNITY', 'OPPORTUNITY_FOUND', `Profitable opportunity detected. Est. Profit: ${opportunityPayload.estimatedProfit} ${opportunityPayload.loanToken}`, opportunityPayload);
 
@@ -91,9 +94,17 @@ async function findAndExecuteArbitrage(pair, loanAmount) {
     try {
         log('INFO', 'TRADE_ATTEMPT', 'Attempting to execute profitable trade.', opportunityPayload);
         const gasPrice = await getDynamicGasPrice(provider, BOT_CONFIG.GAS_PRICE_STRATEGY);
-        const estimatedGas = await arbitrageContract.estimateGas.executeArbitrage(loanTokenAddress, loanAmount, swaps);
-        const gasLimit = BigInt(Math.round(Number(estimatedGas) * 1.2)); // 20% buffer
         
+        const estimatedGas = await arbitrageContract.estimateGas.executeArbitrage(loanTokenAddress, loanAmount, swaps, { gasPrice });
+        const gasLimit = BigInt(Math.round(Number(estimatedGas) * 1.2)); // 20% buffer
+        const gasCost = gasPrice * gasLimit;
+        const netProfitAfterGas = netProfit - gasCost;
+
+        if (netProfitAfterGas <= minProfitThreshold) {
+            log('INFO', 'PROFIT_TOO_LOW_AFTER_GAS', `Profit below threshold after estimating gas. Est. Profit: ${ethers.formatUnits(netProfitAfterGas, TOKEN_DECIMALS.base[loanTokenSymbol])} ${loanTokenSymbol}`, { ...opportunityPayload, gasCost: ethers.formatEther(gasCost) });
+            return { status: 'PROFIT_TOO_LOW_AFTER_GAS' };
+        }
+
         const tx = await arbitrageContract.executeArbitrage(loanTokenAddress, loanAmount, swaps, { gasPrice, gasLimit });
         log('INFO', 'TX_SENT', `Transaction submitted with hash: ${tx.hash}`, { txHash: tx.hash });
 
@@ -114,6 +125,31 @@ async function findAndExecuteArbitrage(pair, loanAmount) {
 
 // --- Main Bot Loop ---
 async function run() {
+    log('INFO', 'BOT_STARTING', 'Initializing arbitrage bot...');
+
+    try {
+        const dexKeys = Object.keys(DEX_ROUTERS.base);
+        log('INFO', 'CONFIG_LOADING', `Querying smart contract for whitelisted routers among: ${dexKeys.join(', ')}`);
+
+        for (const dex of dexKeys) {
+            const routerAddress = DEX_ROUTERS.base[dex].router;
+            const isWhitelisted = await arbitrageContract.whitelistedRouters(routerAddress);
+            if (isWhitelisted) {
+                whitelistedDEXs.push(dex);
+            }
+        }
+
+        if (whitelistedDEXs.length === 0) {
+            log('WARN', 'CONFIG_WARNING', 'No whitelisted DEX routers found on the smart contract. The bot will not be able to execute any trades.');
+        } else {
+            log('INFO', 'CONFIG_LOADED', `Bot will exclusively use these DEXs for opportunities: ${whitelistedDEXs.join(', ')}`);
+        }
+    } catch (error) {
+        log('ERROR', 'FATAL_ERROR', `Failed to load whitelisted routers from the smart contract: ${error.message}`, { error: error.stack });
+        log('ERROR', 'FATAL_ERROR', 'This is a critical failure. The bot cannot proceed without knowing the valid routers. Exiting.');
+        process.exit(1);
+    }
+
     log('INFO', 'BOT_STARTED', 'Arbitrage bot is running and waiting for new blocks.', { walletAddress: wallet.address, network: activeNetwork });
 
     provider.on('block', async (blockNumber) => {
@@ -132,6 +168,7 @@ async function run() {
         }
     });
 }
+
 
 // --- Graceful Shutdown --- 
 function cleanup() {
@@ -153,7 +190,7 @@ process.on('SIGTERM', () => {
 
 // --- Bot Execution ---
 run().catch(error => {
-    log('ERROR', 'FATAL_ERROR', `A fatal error occurred, and the bot must exit: ${error.message}`, { error: error.stack });
+    log('ERROR', 'FATAL_ERROR', `A fatal error occurred, and the bot must exit: ${error.message}`, { error: stack: error.stack });
     cleanup();
     process.exit(1);
 });

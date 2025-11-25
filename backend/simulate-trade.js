@@ -22,21 +22,20 @@ async function getNativeTokenPriceInToken(network, provider, loanTokenAddress) {
         const usdcAmount = nativeToUsdcPath.amountOut;
         
         // Find path from Loan Token to USDC
-        const loanTokenDecimals = TOKEN_DECIMALS[network][Object.keys(TOKENS[network]).find(key => TOKENS[network][key] === loanTokenAddress)];
+        const loanTokenSymbol = Object.keys(TOKENS[network]).find(key => TOKENS[network][key].toLowerCase() === loanTokenAddress.toLowerCase());
+        const loanTokenDecimals = TOKEN_DECIMALS[network][loanTokenSymbol];
         const loanTokenToUsdcPath = await findBestPath(loanTokenAddress, usdcAddress, parseUnits('1', loanTokenDecimals), provider, ['PancakeSwap', 'Aerodrome']);
         if (!loanTokenToUsdcPath || loanTokenToUsdcPath.amountOut === 0n) return null;
         const usdcPerLoanToken = loanTokenToUsdcPath.amountOut;
 
         // The price is the ratio of their values in USDC
-        // (Value of 1 Native in USDC) / (Value of 1 Loan Token in USDC)
-        const price = parseFloat(formatUnits(usdcAmount, 6)) / parseFloat(formatUnits(usPerLoanToken, 6));
+        const price = parseFloat(formatUnits(usdcAmount, 6)) / parseFloat(formatUnits(usdcPerLoanToken, 6));
         
         return price;
 
     } catch (error) {
         console.error("Error fetching native token price:", error);
-        // As a fallback, you could use a hardcoded or less reliable price source
-        return null; // Indicate that price could not be fetched
+        return null; 
     }
 }
 
@@ -45,7 +44,9 @@ async function simulateTrade(tradeParams) {
     const { network, tokenA, tokenB, amount, dex1, dex2, isStable } = tradeParams;
 
     const provider = getProvider(network, NETWORKS);
-    const tokenADecimals = TOKEN_DECIMALS[network][Object.keys(TOKENS[network]).find(key => TOKENS[network][key] === tokenA)];
+    const tokenASymbol = Object.keys(TOKENS[network]).find(key => TOKENS[network][key].toLowerCase() === tokenA.toLowerCase());
+    const tokenADecimals = TOKEN_DECIMALS[network][tokenASymbol];
+
     if (!tokenADecimals) {
         throw new Error(`Decimals not found for token: ${tokenA} on network ${network}`);
     }
@@ -70,7 +71,7 @@ async function simulateTrade(tradeParams) {
     // 3. Estimate Gas Cost
     const gasPrice = await getGasPrice(provider, BOT_CONFIG.GAS_PRICE_STRATEGY);
     const estimatedGasLimit = BigInt(BOT_CONFIG.GAS_LIMIT_MANUAL_TRADE); 
-    const estimatedGasCostNative = estimatedGasLimit * gasPrice; // This is in the native currency (e.g., ETH)
+    const estimatedGasCostNative = estimatedGasLimit * gasPrice;
 
     // 4. Convert Gas Cost to Loan Token
     const nativeTokenPrice = await getNativeTokenPriceInToken(network, provider, tokenA);
@@ -78,7 +79,6 @@ async function simulateTrade(tradeParams) {
         throw new Error("Could not determine the price of the native token to calculate net profit.");
     }
 
-    // The price is Native-per-LoanToken. We need to convert gas (in Native) to the loan token value.
     const estimatedGasCostInToken = (Number(formatUnits(estimatedGasCostNative, 18)) / nativeTokenPrice).toFixed(tokenADecimals);
     const estimatedGasCostInTokenBigInt = parseUnits(estimatedGasCostInToken, tokenADecimals);
 
@@ -89,9 +89,9 @@ async function simulateTrade(tradeParams) {
         isProfitable: netProfit > 0n,
         estimatedProfit: formatUnits(netProfit, tokenADecimals),
         grossProfit: formatUnits(grossProfit, tokenADecimals),
-        estimatedGasCost: formatUnits(estimatedGasCostNative, 18), // In native currency (e.g., ETH)
-        bestFee1: path1.fee.toString(),
-        bestFee2: path2.fee.toString(),
+        estimatedGasCost: formatUnits(estimatedGasCostNative, 18),
+        bestFee1: path1.fee ? path1.fee.toString() : 'N/A',
+        bestFee2: path2.fee ? path2.fee.toString() : 'N/A',
     };
 }
 
