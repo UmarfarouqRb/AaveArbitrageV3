@@ -1,4 +1,3 @@
-
 import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { usePrivy } from '@privy-io/react-auth';
@@ -58,7 +57,7 @@ const App = () => {
         </ErrorBoundary>
 
         <footer>
-          powered by forge inc
+          Powered by Forge Inc.
         </footer>
       </div>
     </Router>

@@ -1,29 +1,11 @@
+/* --- MASTER STYLESHEET --- */
 
-:root[data-theme='dark'] {
-  --background: #1a1a1a;
-  --background-gradient-start: #1e1e1e;
-  --background-gradient-end: #121212;
-  --text-primary: #ffffff;
-  --text-secondary: #a0a0a0;
-  --border-color: #333333;
-  --card-background: #2a2a2a;
-  --header-background: rgba(26, 26, 26, 0.8);
-  --primary-button-bg: #007bff;
-  --primary-button-text: #ffffff;
-  --primary-button-hover-bg: #0056b3;
-  --accent-color: #FF8C00;
-  --accent-color-text: #ffffff;
-  --accent-color-hover: #E07B00;
-  --success-color: #28a745;
-  --error-color: #dc3545;
-  --success-border: rgba(40, 167, 69, 0.5);
-  --error-border: rgba(220, 53, 69, 0.5);
-}
+/* --------------------------
+   1. Root & Color Variables
+   -------------------------- */
 
-:root[data-theme='light'] {
+:root {
   --background: #ffffff;
-  --background-gradient-start: #f5f5f5;
-  --background-gradient-end: #ffffff;
   --text-primary: #000000;
   --text-secondary: #555555;
   --border-color: #dddddd;
@@ -37,28 +19,47 @@
   --accent-color-hover: #E07B00;
   --success-color: #28a745;
   --error-color: #dc3545;
-  --success-border: rgba(40, 167, 69, 0.5);
-  --error-border: rgba(220, 53, 69, 0.5);
 }
+
+/* -----------------------
+   2. Base & Body Styles
+   ----------------------- */
 
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(180deg, var(--background-gradient-start), var(--background-gradient-end)) no-repeat;
+  background-color: var(--background);
   color: var(--text-primary);
 }
+
+/* -------------------
+   3. Layout Containers
+   ------------------- */
 
 #app-container {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  font-family: sans-serif;
-  color: var(--text-primary);
 }
+
+.container {
+  display: flex;
+  gap: 1.5rem;
+  width: 100%;
+  margin: 1.5rem auto 0;
+  padding: 0 1rem;
+  flex-grow: 1;
+}
+
+main {
+    flex-grow: 1;
+}
+
+/* -------------------
+   4. Header & Navigation
+   ------------------- */
 
 header {
   position: sticky;
@@ -77,53 +78,6 @@ header h1 {
   font-size: 1.25rem;
   font-weight: 600;
 }
-
-header h1 a {
-  color: var(--accent-color);
-  text-decoration: none;
-}
-
-.button {
-    font-weight: 500;
-    padding: 0.5rem 1rem;
-    border-radius: 0.5rem;
-    transition: all 0.2s ease-in-out;
-    border: 1px solid var(--border-color);
-    background-color: var(--card-background);
-    color: var(--text-primary);
-    cursor: pointer;
-}
-
-.button:hover {
-    background-color: var(--background);
-    border-color: var(--text-secondary);
-}
-
-.button.primary-action {
-    background-color: var(--primary-button-bg);
-    color: var(--primary-button-text);
-    border-color: var(--primary-button-bg);
-}
-
-.button.primary-action:hover {
-    background-color: var(--primary-button-hover-bg);
-    border-color: var(--primary-button-hover-bg);
-}
-
-.theme-switcher {
-    background: transparent;
-    border: none;
-    padding: 0.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.theme-switcher:hover {
-    background: var(--card-background) !important; 
-    border-color: var(--border-color) !important;
-}
-
 
 .topnav-container {
   flex-grow: 1;
@@ -159,281 +113,41 @@ header h1 a {
   transform: translateY(-2px);
 }
 
-.container {
-  display: flex;
-  gap: 1.5rem;
-  width: 100%;
-  margin: 1.5rem auto 0;
-  padding: 0 1rem;
-  flex-grow: 1;
-}
 
-main {
-    flex-grow: 1;
-}
+/* -------------------
+   5. Buttons
+   ------------------- */
 
-.sidenav {
-    flex-shrink: 0;
-    width: 200px;
-    background-color: var(--card-background);
-    padding: 1rem;
-    border-right: 1px solid var(--border-color);
-    border-radius: 1rem;
-}
-
-.sidenav ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.sidenav li a {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 1rem;
-    text-decoration: none;
-    color: var(--text-secondary);
+.button {
     font-weight: 500;
+    padding: 0.5rem 1rem;
     border-radius: 0.5rem;
     transition: all 0.2s ease-in-out;
-}
-
-.sidenav li a:hover {
-    background-color: var(--background);
+    border: 1px solid var(--border-color);
+    background-color: var(--card-background);
     color: var(--text-primary);
+    cursor: pointer;
 }
 
-.sidenav li a.active {
+.button:hover {
+    background-color: var(--background);
+    border-color: var(--text-secondary);
+}
+
+.button.primary-action {
     background-color: var(--primary-button-bg);
     color: var(--primary-button-text);
+    border-color: var(--primary-button-bg);
 }
 
-.loading-container {
-  background-color: var(--card-background);
-  border: 1px solid var(--border-color);
-  border-radius: 0.5rem;
-  padding: 2rem;
-  text-align: center;
-  color: var(--text-secondary);
+.button.primary-action:hover {
+    background-color: var(--primary-button-hover-bg);
+    border-color: var(--primary-button-hover-bg);
 }
 
-.manual-trade-container {
-  max-width: 36rem;
-  margin: 2rem auto;
-  background-color: var(--card-background);
-  padding: 2rem;
-  border-radius: 1rem;
-  border: 1px solid var(--border-color);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-}
-
-.manual-trade-header {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 1.5rem;
-  color: var(--text-primary);
-}
-
-.form-row {
-  background-color: var(--background);
-  padding: 1rem;
-  border-radius: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.form-row:hover {
-  background-color: rgba(0,0,0,0.1);
-}
-
-.form-row label {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
-.form-row input, .form-row select {
-  width: 100%;
-  background-color: transparent;
-  font-size: 1.5rem;
-  font-family: monospace;
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 0.5rem;
-  padding: 0.5rem;
-  outline: none;
-}
-
-.form-row input:focus, .form-row select:focus {
-  outline: 2px solid var(--primary-button-bg);
-}
-
-.dex-selection-section {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.dex-selection-section div {
-  background-color: var(--background);
-  padding: 0.75rem;
-  border-radius: 0.75rem;
-}
-
-.dex-selection-section label {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
-
-.manual-trade-container button {
-  width: 100%;
-  font-weight: 700;
-  padding: 0.85rem 1rem;
-  border-radius: 0.75rem;
-  transition: all 200ms ease-in-out;
-  font-size: 1.125rem;
-  box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2);
-}
-
-.manual-trade-container button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.manual-trade-container > button {
-  background-color: var(--primary-button-bg);
-  color: var(--primary-button-text);
-}
-
-.manual-trade-container > button:hover:not(:disabled) {
-  background-color: var(--primary-button-hover-bg);
-  transform: translateY(-2px);
-}
-
-.simulation-result-container button {
-  background-color: var(--accent-color);
-  color: var(--accent-color-text);
-  margin-top: 1rem;
-}
-
-.simulation-result-container button:hover {
-  background-color: var(--accent-color-hover);
-}
-
-.error-message {
-  color: var(--error-color);
-  margin-top: 1rem;
-  text-align: center;
-}
-
-.simulation-result-container {
-  margin-top: 1.5rem;
-  padding: 1rem;
-  background-color: var(--background);
-  border-radius: 0.75rem;
-  border: 2px solid transparent;
-}
-
-.profit-border {
-  border-color: var(--success-border);
-}
-
-.loss-border {
-  border-color: var(--error-border);
-}
-
-.simulation-result-container h3 {
-  font-weight: 700;
-  font-size: 1.125rem;
-  color: var(--text-primary);
-  margin-bottom: 0.5rem;
-}
-
-.simulation-result-container div div {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.875rem;
-}
-
-.simulation-result-container div div span:first-child {
-  color: var(--text-secondary);
-}
-
-.text-success {
-  color: var(--success-color);
-  font-weight: bold;
-}
-
-.text-error {
-  color: var(--error-color);
-  font-weight: bold;
-}
-
-.result-container {
-  text-align: center;
-  margin-top: 1.5rem;
-  padding: 1rem;
-  background-color: var(--background);
-  border-radius: 0.75rem;
-}
-
-.result-container p {
-  font-weight: 700;
-  font-size: 1.125rem;
-}
-
-.result-container a {
-  color: var(--primary-button-bg);
-  text-decoration: underline;
-  margin-top: 0.5rem;
-}
-
-.token-input-container {
-  position: relative;
-  display: flex; 
-}
-
-.paste-icon-button {
-  position: absolute;
-  top: 50%;
-  right: 0.5rem; 
-  transform: translateY(-50%);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 0.5rem;
-}
-
-.paste-icon-button svg {
-  fill: var(--text-secondary);
-}
-
-.paste-icon-button:hover svg {
-  fill: var(--text-primary);
-}
-
-select {
-  background-color: var(--background);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 5px;
-  padding: 10px;
-  font-size: 16px;
-  width: 100%;
-}
-
-select option {
-  background-color: var(--background);
-  color: var(--text-primary);
-}
-
-input[type="checkbox"] {
-  cursor: pointer;
-  position: relative;
-  top: 2px;
-}
-
+/* --------------------------------
+   6. Bot Page Specific Styles
+   -------------------------------- */
 
 .bot-page-container {
     display: grid;
@@ -547,6 +261,10 @@ input[type="checkbox"] {
     color: var(--accent-color);
     margin-right: 0.75rem;
 }
+
+/* -------------------
+   7. Footer
+   ------------------- */
 
 footer {
   text-align: center;
