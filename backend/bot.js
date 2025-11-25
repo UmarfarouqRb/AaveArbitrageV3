@@ -8,7 +8,6 @@ const IArbitrageABI = AAVE_ARBITRAGE_V3_ABI;
 // --- Globals ---
 const activeNetwork = 'base';
 const provider = new ethers.AlchemyProvider(activeNetwork, process.env.ALCHEMY_API_KEY);
-let whitelistedDEXs = []; // To store the list of approved DEXs
 
 // --- Wallet Initialization ---
 if (!process.env.PRIVATE_KEY) {
@@ -22,21 +21,21 @@ try {
 } catch (error) {
     console.error('!!! CRITICAL ERROR: Failed to initialize the wallet. The provided private key is likely invalid. !!!');
     console.error('Error details:', error.message);
-    process.exit(1); // Exit immediately if the wallet cannot be created.
+    process.exit(1); 
 }
 
 console.log(`Successfully initialized wallet. Address: ${wallet.address}`);
 
 const arbitrageContract = new ethers.Contract(BOT_CONFIG.ARBITRAGE_CONTRACT_ADDRESS, IArbitrageABI, wallet);
 
-// --- IPC Broadcasting: Send structured messages to the parent process (server.js) ---
+// --- IPC Broadcasting ---
 function broadcast(type, data) {
     if (process.send) {
         process.send({ type, data });
     }
 }
 
-// --- Structured Logging via IPC ---
+// --- Structured Logging ---
 function log(logLevel, event, message, payload = {}) {
     console.log(`[${logLevel}] ${event}: ${message}`, payload);
     broadcast('bot-update', { logLevel, event, message, payload, timestamp: new Date().toISOString() });
@@ -46,13 +45,17 @@ function log(logLevel, event, message, payload = {}) {
 async function findAndExecuteArbitrage(pair, loanAmount) {
     const [loanTokenAddress, targetTokenAddress] = pair;
     const loanTokenSymbol = Object.keys(LOAN_TOKENS).find(key => getAddress(TOKENS.base[key]) === getAddress(loanTokenAddress));
+    const allDexs = Object.keys(DEX_ROUTERS.base);
 
-    // Only search on whitelisted DEXs
-    const path1 = await findBestPath(loanTokenAddress, targetTokenAddress, loanAmount, provider, whitelistedDEXs);
-    if (!path1) return { status: 'NO_PATH' };
+    const path1 = await findBestPath(loanTokenAddress, targetTokenAddress, loanAmount, provider, allDexs);
+    if (!path1) {
+        return { status: 'NO_PATH' };
+    }
 
-    const path2 = await findBestPath(targetTokenAddress, loanTokenAddress, path1.amountOut, provider, whitelistedDEXs);
-    if (!path2) return { status: 'NO_PATH' };
+    const path2 = await findBestPath(targetTokenAddress, loanTokenAddress, path1.amountOut, provider, allDexs);
+    if (!path2) {
+        return { status: 'NO_PATH' };
+    }
 
     const amountOutMin1 = path1.amountOut * BigInt(Math.round((1 - BOT_CONFIG.SLIPPAGE_TOLERANCE) * 10000)) / 10000n;
     const amountOutMin2 = path2.amountOut * BigInt(Math.round((1 - BOT_CONFIG.SLIPPAGE_TOLERANCE) * 10000)) / 10000n;
@@ -72,6 +75,19 @@ async function findAndExecuteArbitrage(pair, loanAmount) {
     }
 
     log('OPPORTUNITY', 'OPPORTUNITY_FOUND', `Profitable opportunity detected. Est. Profit: ${opportunityPayload.estimatedProfit} ${opportunityPayload.loanToken}`, opportunityPayload);
+
+    try {
+        const router1Whitelisted = await arbitrageContract.whitelistedRouters(DEX_ROUTERS.base[path1.dex].router);
+        const router2Whitelisted = await arbitrageContract.whitelistedRouters(DEX_ROUTERS.base[path2.dex].router);
+
+        if (!router1Whitelisted || !router2Whitelisted) {
+            log('INFO', 'ROUTERS_NOT_WHITELISTED', `Trade aborted. One or both DEX routers are not whitelisted. Path: ${path1.dex} -> ${path2.dex}`)
+            return { status: 'ROUTERS_NOT_WHITELISTED' };
+        }
+    } catch (error) {
+        log('ERROR', 'WHITELIST_CHECK_FAILED', `Failed to verify router whitelist status: ${error.message}`);
+        return { status: 'WHITELIST_CHECK_FAILED' };
+    }
 
     const getDexParams = (path, amountOutMin) => {
         const dexType = DEX_TYPES[path.dex];
@@ -96,7 +112,7 @@ async function findAndExecuteArbitrage(pair, loanAmount) {
         const gasPrice = await getDynamicGasPrice(provider, BOT_CONFIG.GAS_PRICE_STRATEGY);
         
         const estimatedGas = await arbitrageContract.executeArbitrage.estimateGas(loanTokenAddress, loanAmount, swaps, { gasPrice });
-        const gasLimit = BigInt(Math.round(Number(estimatedGas) * 1.2)); // 20% buffer
+        const gasLimit = BigInt(Math.round(Number(estimatedGas) * 1.2));
         const gasCost = gasPrice * gasLimit;
         const netProfitAfterGas = netProfit - gasCost;
 
@@ -125,31 +141,6 @@ async function findAndExecuteArbitrage(pair, loanAmount) {
 
 // --- Main Bot Loop ---
 async function run() {
-    log('INFO', 'BOT_STARTING', 'Initializing arbitrage bot...');
-
-    try {
-        const dexKeys = Object.keys(DEX_ROUTERS.base);
-        log('INFO', 'CONFIG_LOADING', `Querying smart contract for whitelisted routers among: ${dexKeys.join(', ')}`);
-
-        for (const dex of dexKeys) {
-            const routerAddress = DEX_ROUTERS.base[dex].router;
-            const isWhitelisted = await arbitrageContract.whitelistedRouters(routerAddress);
-            if (isWhitelisted) {
-                whitelistedDEXs.push(dex);
-            }
-        }
-
-        if (whitelistedDEXs.length === 0) {
-            log('WARN', 'CONFIG_WARNING', 'No whitelisted DEX routers found on the smart contract. The bot will not be able to execute any trades.');
-        } else {
-            log('INFO', 'CONFIG_LOADED', `Bot will exclusively use these DEXs for opportunities: ${whitelistedDEXs.join(', ')}`);
-        }
-    } catch (error) {
-        log('ERROR', 'FATAL_ERROR', `Failed to load whitelisted routers from the smart contract: ${error.message}`, { error: error.stack });
-        log('ERROR', 'FATAL_ERROR', 'This is a critical failure. The bot cannot proceed without knowing the valid routers. Exiting.');
-        process.exit(1);
-    }
-
     log('INFO', 'BOT_STARTED', 'Arbitrage bot is running and waiting for new blocks.', { walletAddress: wallet.address, network: activeNetwork });
 
     provider.on('block', async (blockNumber) => {
@@ -179,18 +170,17 @@ function cleanup() {
     broadcast('status', { isOnline: false, message: 'Bot has been stopped.' });
 }
 
-process.on('SIGINT', () => {
-    cleanup();
-    process.exit(0);
+process.on('SIGINT', () => { 
+    process.exit(0); 
 });
-process.on('SIGTERM', () => {
-    cleanup();
-    process.exit(0);
+process.on('SIGTERM', () => { 
+    process.exit(0); 
 });
+
+process.on('exit', cleanup);
 
 // --- Bot Execution ---
 run().catch(error => {
     log('ERROR', 'FATAL_ERROR', `A fatal error occurred, and the bot must exit: ${error.message}`, { error: { stack: error.stack } });
-    cleanup();
     process.exit(1);
 });

@@ -41,7 +41,9 @@ const BOT_LOG_FILE = path.join(__dirname, 'bot.log');
 
 // --- Bot Process Management ---
 let botProcess = null;
+let isBotStopping = false; // To prevent restart on intentional stop
 let isRestarting = false;
+
 
 function broadcast(message) {
     if (!wss || !wss.clients) return;
@@ -59,6 +61,7 @@ function startBot() {
         return;
     }
     console.log('Starting the arbitrage bot process...');
+    isBotStopping = false;
     isRestarting = false;
 
     botProcess = fork(path.join(__dirname, 'bot.js'), [], {
@@ -75,12 +78,16 @@ function startBot() {
     });
 
     botProcess.on('exit', (code) => {
-        console.error(`Bot process terminated unexpectedly with code: ${code}.`);
         botProcess = null; // Clear the process handle
-        if (!isRestarting) {
-            isRestarting = true;
-            console.log('Attempting to restart bot in 5 seconds...');
-            setTimeout(startBot, 5000);
+        if (isBotStopping) {
+            console.log(`Bot process stopped intentionally.`);
+        } else {
+            console.error(`Bot process terminated unexpectedly with code: ${code}.`);
+            if (!isRestarting) {
+                isRestarting = true;
+                console.log('Attempting to restart bot in 5 seconds...');
+                setTimeout(startBot, 5000);
+            }
         }
     });
 
@@ -92,8 +99,8 @@ function startBot() {
 function stopBot() {
     if (botProcess) {
         console.log('Gracefully stopping the arbitrage bot...');
+        isBotStopping = true;
         botProcess.kill('SIGTERM'); // Send termination signal
-        botProcess = null;
     }
 }
 
