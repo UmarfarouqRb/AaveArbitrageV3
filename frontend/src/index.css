@@ -6,6 +6,7 @@
 
 :root {
   --background: #ffffff;
+  --background-site: #f0f0f0;
   --text-primary: #000000;
   --text-secondary: #555555;
   --border-color: #dddddd;
@@ -30,10 +31,8 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
-  background-color: var(--background);
+  background-color: var(--background-site);
   color: var(--text-primary);
-  max-width: 480px; /* Typical mobile screen width */
-  margin: 0 auto;
 }
 
 /* -------------------
@@ -44,24 +43,11 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-}
-
-@media (min-width: 481px) {
-  body {
-    background-color: #f0f0f0; /* A light grey for the background on desktop */
-  }
-  #app-container {
-    display: none;
-  }
-  body::after {
-    content: "This application is designed for mobile use only.";
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    font-size: 1.5rem;
-    color: #555;
-  }
+  width: 100%;
+  max-width: 1200px; /* Max width for desktop, allows responsiveness */
+  margin: 0 auto;
+  background-color: var(--background);
+  box-shadow: 0 0 20px rgba(0,0,0,0.05);
 }
 
 .container {
@@ -71,6 +57,7 @@ body {
   margin: 1.5rem auto 0;
   padding: 0 1rem;
   flex-grow: 1;
+  box-sizing: border-box;
 }
 
 main {
@@ -94,13 +81,15 @@ header {
   background-color: var(--header-background);
   backdrop-filter: blur(10px);
   z-index: 1000;
+  box-sizing: border-box;
 }
 
 header h1 {
-  font-size: 2rem;
+  font-size: clamp(1.5rem, 5vw, 2rem); /* Responsive font size */
   font-weight: bold;
   color: var(--accent-color);
 }
+
 
 header h1 a {
   text-decoration: none;
@@ -122,9 +111,10 @@ header h1 a {
   border-radius: 0.5rem;
   text-decoration: none;
   font-weight: bold;
-  font-size: 1.2rem;
+  font-size: clamp(1rem, 4vw, 1.2rem); /* Responsive font size */
   transition: background-color 0.3s, transform 0.2s;
   border: 1px solid var(--border-color);
+  white-space: nowrap;
 }
 
 .topnav-item:hover {
@@ -160,7 +150,7 @@ header h1 a {
     background-color: var(--card-background);
     color: var(--text-primary);
     cursor: pointer;
-    font-size: 1.2rem;
+    font-size: clamp(1rem, 4vw, 1.2rem); /* Responsive font size */
 }
 
 .button:hover {
@@ -188,8 +178,9 @@ header h1 a {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto 1fr;
     gap: 1.5rem;
-    flex-grow: 1; /* Allow the container to grow and fill the available vertical space */
-    margin: 0 -1rem; /* Use negative margins to break out of the parent's horizontal padding */
+    flex-grow: 1;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .panel {
@@ -226,7 +217,7 @@ header h1 a {
 }
 
 .metric-card-value {
-    font-size: 1.5rem;
+    font-size: clamp(1.2rem, 4vw, 1.5rem); /* Responsive font size */
     font-weight: 700;
 }
 
@@ -304,7 +295,7 @@ header h1 a {
 .manual-trade-container {
     display: flex;
     flex-direction: column;
-    flex-grow: 1; /* This will make it take up the full height of 'main' */
+    flex-grow: 1; 
     width: 100%;
     padding: 1rem;
     box-sizing: border-box;
@@ -343,9 +334,10 @@ header h1 a {
     background-color: var(--background);
     color: var(--text-primary);
     font-size: 1rem;
-    appearance: none; /* Remove default arrow */
+    box-sizing: border-box;
     -webkit-appearance: none;
     -moz-appearance: none;
+    appearance: none;
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
     background-repeat: no-repeat;
     background-position: right 1rem center;
@@ -359,7 +351,7 @@ header h1 a {
 }
 
 .input-with-button input {
-    padding-right: 3rem; /* Make space for the button */
+    padding-right: 3rem; 
 }
 
 .input-with-button button {
@@ -384,4 +376,23 @@ footer {
   margin-top: auto;
   font-size: 0.875rem;
   color: var(--text-secondary);
+}
+
+/* -------------------
+   9. Media Queries for Responsiveness
+   ------------------- */
+
+@media (max-width: 600px) {
+    .topnav-container {
+        gap: 0.5rem;
+    }
+    .topnav-item {
+        padding: 0.5rem 0.75rem;
+    }
+    .container {
+        padding: 0 0.5rem;
+    }
+    .panel {
+        padding: 1rem;
+    }
 }

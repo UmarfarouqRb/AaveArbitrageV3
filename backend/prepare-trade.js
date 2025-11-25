@@ -77,7 +77,7 @@ async function prepareTrade(tradeParams) {
         }
     ];
 
-    const { data } = await arbitrageBot.populateTransaction.executeArbitrage(
+    const populatedTx = await arbitrageBot.executeArbitrage.populateTransaction(
         tokenA,
         loanAmountBigInt,
         swaps
@@ -87,7 +87,7 @@ async function prepareTrade(tradeParams) {
         tx: {
             to: BOT_CONFIG.ARBITRAGE_CONTRACT_ADDRESS,
             from: userAddress,
-            data,
+            data: populatedTx.data,
         }
     };
 }

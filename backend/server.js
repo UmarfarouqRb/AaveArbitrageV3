@@ -30,6 +30,11 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
+// --- Serve Frontend ---
+const frontendDistPath = path.join(__dirname, '..', 'frontend', 'dist');
+app.use(express.static(frontendDistPath));
+
+
 // --- File Paths ---
 const MANUAL_TRADE_HISTORY_FILE = path.join(__dirname, 'manual_trade_history.json');
 const BOT_LOG_FILE = path.join(__dirname, 'bot.log');
@@ -131,6 +136,12 @@ app.post('/api/prepare-trade', async (req, res) => {
         res.status(500).json({ message: error.message || 'An unexpected error occurred during preparation.' });
     }
 });
+
+// --- Fallback for SPA ---
+app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendDistPath, 'index.html'));
+});
+
 
 // --- WebSocket Server ---
 const server = app.listen(port, host, () => {

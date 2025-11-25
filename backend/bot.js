@@ -95,7 +95,7 @@ async function findAndExecuteArbitrage(pair, loanAmount) {
         log('INFO', 'TRADE_ATTEMPT', 'Attempting to execute profitable trade.', opportunityPayload);
         const gasPrice = await getDynamicGasPrice(provider, BOT_CONFIG.GAS_PRICE_STRATEGY);
         
-        const estimatedGas = await arbitrageContract.estimateGas.executeArbitrage(loanTokenAddress, loanAmount, swaps, { gasPrice });
+        const estimatedGas = await arbitrageContract.executeArbitrage.estimateGas(loanTokenAddress, loanAmount, swaps, { gasPrice });
         const gasLimit = BigInt(Math.round(Number(estimatedGas) * 1.2)); // 20% buffer
         const gasCost = gasPrice * gasLimit;
         const netProfitAfterGas = netProfit - gasCost;
@@ -190,7 +190,7 @@ process.on('SIGTERM', () => {
 
 // --- Bot Execution ---
 run().catch(error => {
-    log('ERROR', 'FATAL_ERROR', `A fatal error occurred, and the bot must exit: ${error.message}`, { error: stack: error.stack });
+    log('ERROR', 'FATAL_ERROR', `A fatal error occurred, and the bot must exit: ${error.message}`, { error: { stack: error.stack } });
     cleanup();
     process.exit(1);
 });
