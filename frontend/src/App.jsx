@@ -6,6 +6,8 @@ import ErrorBoundary from './components/ErrorBoundary';
 import TopNav from './components/TopNav';
 import LoginPagePrompt from './components/LoginPagePrompt';
 import ThemeSwitcher from './components/ThemeSwitcher';
+import SideNav from './components/SideNav';
+import useOwner from './hooks/useOwner';
 
 // Lazy load the pages
 const ArbitrageBotPage = lazy(() => import('./pages/ArbitrageBotPage'));
@@ -13,11 +15,13 @@ const ManualTradePage = lazy(() => import('./pages/ManualTradePage'));
 const HistoryPage = lazy(() => import('./pages/HistoryPage'));
 
 const App = () => {
-  const { login, logout, ready, authenticated } = usePrivy();
+  const { login, logout, ready, authenticated, user } = usePrivy();
+  const owner = useOwner();
 
   // A wrapper for the authenticated user's view
   const AuthenticatedLayout = () => (
     <div className="container">
+        {user && owner && user.wallet.address === owner && <SideNav />}
         <main>
             <Suspense fallback={<div className="loading-container"><h2>Loading...</h2></div>}>
               <Routes>
@@ -37,7 +41,6 @@ const App = () => {
           <h1>
             <Link to="/">FlashBot</Link>
           </h1>
-          <TopNav />
           <div className="controls">
             <ThemeSwitcher />
             {ready && authenticated ? (
@@ -47,6 +50,7 @@ const App = () => {
             )}
           </div>
         </header>
+        <TopNav />
 
         <ErrorBoundary>
           {ready ? (

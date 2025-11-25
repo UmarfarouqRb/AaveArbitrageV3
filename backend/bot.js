@@ -1,10 +1,9 @@
-const path = require('path');
 const { ethers, formatUnits, getAddress, AbiCoder } = require('ethers');
 const { NETWORKS, TOKENS, TOKEN_DECIMALS, ARBITRAGE_PAIRS, LOAN_TOKENS, LOAN_AMOUNTS, DEX_TYPES, BOT_CONFIG, DEX_ROUTERS } = require('./config');
 const { findBestPath, getDynamicGasPrice } = require('./services');
+const { AAVE_ARBITRAGE_V3_ABI } = require('./abi.js');
 
-const AaveArbitrageV3Json = require(path.join(__dirname, '../out/AaveArbitrageV3.sol/AaveArbitrageV3.json'));
-const IArbitrageABI = AaveArbitrageV3Json.abi;
+const IArbitrageABI = AAVE_ARBITRAGE_V3_ABI;
 
 // --- Globals ---
 const activeNetwork = 'base';
