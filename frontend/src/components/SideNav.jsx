@@ -3,7 +3,7 @@ import { FaHome, FaSearch, FaRobot, FaListAlt, FaTools } from 'react-icons/fa';
 
 const SideNav = ({ isOwner }) => {
   return (
-    <nav className="side-nav" style={{ display: 'none' }}>
+    <nav className="sidenav" style={{ display: 'none' }}>
       <ul>
         <li><Link to="/"><FaHome />Home</Link></li>
         <li><Link to="/finder"><FaSearch />Arbitrage Finder</Link></li>

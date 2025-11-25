@@ -67,7 +67,7 @@ header {
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.5rem;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 2px solid var(--border-color);
   background-color: var(--header-background);
   backdrop-filter: blur(10px);
   z-index: 1000;
@@ -78,18 +78,135 @@ header h1 {
   font-weight: 600;
 }
 
-header button {
-  font-weight: 500;
-  padding: 0.5rem 1rem;
+header h1 a {
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+.button {
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease-in-out;
+    border: 1px solid var(--border-color);
+    background-color: var(--card-background);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.button:hover {
+    background-color: var(--background);
+    border-color: var(--text-secondary);
+}
+
+.button.primary-action {
+    background-color: var(--primary-button-bg);
+    color: var(--primary-button-text);
+    border-color: var(--primary-button-bg);
+}
+
+.button.primary-action:hover {
+    background-color: var(--primary-button-hover-bg);
+    border-color: var(--primary-button-hover-bg);
+}
+
+.theme-switcher {
+    background: transparent;
+    border: none;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.theme-switcher:hover {
+    background: var(--card-background) !important; 
+    border-color: var(--border-color) !important;
+}
+
+
+.topnav-container {
+  flex-grow: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+}
+
+.topnav-item {
+  background-color: var(--card-background);
+  color: var(--text-primary);
+  padding: 0.75rem 1.5rem;
   border-radius: 0.5rem;
-  transition: all 0.2s ease-in-out;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 1rem;
+  transition: background-color 0.3s, transform 0.2s;
+  border: 1px solid var(--border-color);
+}
+
+.topnav-item:hover {
+  background-color: var(--background);
+  transform: translateY(-2px);
+  border-color: var(--text-secondary);
+}
+
+.topnav-item.active {
+  background-color: var(--primary-button-bg);
+  color: var(--primary-button-text);
+  border-color: var(--primary-button-bg);
+  box-shadow: 0 4px 10px rgba(0, 85, 170, 0.4);
+  transform: translateY(-2px);
 }
 
 .container {
+  display: flex;
+  gap: 1.5rem;
   width: 100%;
   margin: 1.5rem auto 0;
   padding: 0 1rem;
-  flex-grow: 1; /* Ensures content pushes footer down */
+  flex-grow: 1;
+}
+
+main {
+    flex-grow: 1;
+}
+
+.sidenav {
+    flex-shrink: 0;
+    width: 200px;
+    background-color: var(--card-background);
+    padding: 1rem;
+    border-right: 1px solid var(--border-color);
+    border-radius: 1rem;
+}
+
+.sidenav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sidenav li a {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-weight: 500;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease-in-out;
+}
+
+.sidenav li a:hover {
+    background-color: var(--background);
+    color: var(--text-primary);
+}
+
+.sidenav li a.active {
+    background-color: var(--primary-button-bg);
+    color: var(--primary-button-text);
 }
 
 .loading-container {
@@ -109,7 +226,6 @@ header button {
   border-radius: 1rem;
   border: 1px solid var(--border-color);
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease-in-out;
 }
 
 .manual-trade-header {
@@ -119,34 +235,35 @@ header button {
   color: var(--text-primary);
 }
 
-.form-section .form-row {
+.form-row {
   background-color: var(--background);
   padding: 1rem;
   border-radius: 0.75rem;
   margin-bottom: 1rem;
-  transition: background-color 0.2s ease-in-out;
 }
 
-.form-section .form-row:hover {
+.form-row:hover {
   background-color: rgba(0,0,0,0.1);
 }
 
-.form-section .form-row label {
+.form-row label {
   font-size: 0.8rem;
   color: var(--text-secondary);
 }
 
-.form-section .form-row input, .form-section .form-row select {
+.form-row input, .form-row select {
   width: 100%;
   background-color: transparent;
   font-size: 1.5rem;
   font-family: monospace;
   color: var(--text-primary);
-  border: none;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
   outline: none;
 }
 
-.form-section .form-row input:focus, .form-section .form-row select:focus {
+.form-row input:focus, .form-row select:focus {
   outline: 2px solid var(--primary-button-bg);
 }
 
@@ -216,7 +333,6 @@ header button {
   background-color: var(--background);
   border-radius: 0.75rem;
   border: 2px solid transparent;
-  transition: border-color 0.3s;
 }
 
 .profit-border {
@@ -271,17 +387,17 @@ header button {
   color: var(--primary-button-bg);
   text-decoration: underline;
   margin-top: 0.5rem;
-  display: inline-block;
 }
 
 .token-input-container {
   position: relative;
+  display: flex; 
 }
 
 .paste-icon-button {
   position: absolute;
   top: 50%;
-  right: 1rem;
+  right: 0.5rem; 
   transform: translateY(-50%);
   background: transparent;
   border: none;
@@ -291,7 +407,6 @@ header button {
 
 .paste-icon-button svg {
   fill: var(--text-secondary);
-  transition: fill 200ms;
 }
 
 .paste-icon-button:hover svg {
@@ -299,157 +414,138 @@ header button {
 }
 
 select {
-  background-color: #2c2c2c;
-  color: #ffffff;
-  border: 1px solid #444;
+  background-color: var(--background);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
   border-radius: 5px;
   padding: 10px;
   font-size: 16px;
   width: 100%;
-  box-sizing: border-box;
-  appearance: none;
-  background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23ffffff"><path d="M7 10l5 5 5-5z"/></svg>');
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 20px;
 }
 
 select option {
-  background-color: #2c2c2c;
-  color: #ffffff;
-}
-
-input[type="checkbox"] {
-  appearance: none;
-  background-color: #2c2c2c;
-  border: 1px solid #444;
-  border-radius: 3px;
-  width: 20px;
-  height: 20px;
-  cursor: pointer;
-  position: relative;
-  top: 5px;
-}
-
-input[type="checkbox"]:checked {
-  background-color: #007bff;
-}
-
-input[type="checkbox"]:checked::after {
-  content: '\2713';
-  color: #ffffff;
-  font-size: 14px;
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-}
-
-
-/* Arbitrage Bot Section */
-.arbitrage-bot-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-  gap: 2rem;
-  padding: 2rem;
-}
-
-.bot-module {
-  background-color: var(--card-background);
-  border: 1px solid var(--border-color);
-  border-radius: 1rem;
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-}
-
-.bot-module h2 {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
+  background-color: var(--background);
   color: var(--text-primary);
 }
 
-.bot-controls .control-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.bot-controls .status-indicator {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.bot-controls .status-light {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background-color: var(--text-secondary);
-}
-
-.bot-controls .status-light.active {
-  background-color: var(--success-color);
-}
-
-.bot-controls button {
-  padding: 0.6rem 1.2rem;
-  font-weight: bold;
-  border-radius: 0.5rem;
+input[type="checkbox"] {
   cursor: pointer;
+  position: relative;
+  top: 2px;
 }
 
-.bot-live-logs {
-  flex-grow: 1;
+
+.bot-page-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr;
+    gap: 1.5rem;
+    height: calc(100vh - 8rem);
 }
 
-.bot-logs-container {
-  background-color: var(--background);
-  border-radius: 0.75rem;
-  padding: 1rem;
-  height: 250px;
-  overflow-y: auto;
-  font-family: monospace;
-  font-size: 0.875rem;
+.panel {
+    background-color: var(--card-background);
+    border: 1px solid var(--border-color);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    overflow: hidden;
 }
 
-.bot-logs-container .log-message {
-  margin-bottom: 0.5rem;
+.panel-title {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
 }
 
-.bot-logs-container .log-opportunity {
-  color: var(--accent-color);
+.dashboard-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
 }
 
-.bot-logs-container .log-error {
-  color: var(--error-color);
+.metric-card {
+    background-color: var(--background);
+    padding: 1rem;
+    border-radius: 0.75rem;
 }
 
-.bot-trade-history table {
-  width: 100%;
-  border-collapse: collapse;
+.metric-card-title {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
 }
 
-.bot-trade-history th, .bot-trade-history td {
-  padding: 0.75rem;
-  text-align: left;
-  border-bottom: 1px solid var(--border-color);
+.metric-card-value {
+    font-size: 1.5rem;
+    font-weight: 700;
 }
 
-.bot-trade-history th {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1rem;
 }
 
-.bot-trade-history .status-success {
-  color: var(--success-color);
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: var(--error-color);
 }
 
-.bot-trade-history .status-failed {
-  color: var(--error-color);
+.status-dot.online {
+    background-color: var(--success-color);
+}
+
+.feeds-panel {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.feed-item {
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem 0;
+    font-size: 0.875rem;
+}
+
+.feed-item:last-child {
+    border-bottom: none;
+}
+
+.feed-item-header {
+    display: flex;
+    justify-content: space-between;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.feed-item-profit {
+    color: var(--success-color);
+    font-weight: 700;
+}
+
+.log-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.log-container {
+    flex-grow: 1;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.log-entry {
+    margin-bottom: 0.5rem;
+}
+
+.log-entry .timestamp {
+    color: var(--accent-color);
+    margin-right: 0.75rem;
 }
 
 footer {

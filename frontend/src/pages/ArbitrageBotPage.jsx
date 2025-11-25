@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
-// Helper to format numbers with commas
+// Helper to format numbers with commas, handling potential non-numeric inputs gracefully.
 const formatNumber = (num, decimals = 2) => {
-    const value = parseFloat(num);
+    const value = typeof num === 'number' ? num : parseFloat(num);
     if (isNaN(value)) return '0.00';
     return value.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 };
@@ -12,7 +12,7 @@ const formatNumber = (num, decimals = 2) => {
 const MetricCard = ({ title, value, children }) => (
     <div className="metric-card">
         <div className="metric-card-title">{title}</div>
-        <div className="metric-card-value">{children || value}</div>
+        <div className="metric-card-value">{children || value || '0'}</div>
     </div>
 );
 
@@ -37,9 +37,9 @@ const DashboardPanel = ({ metrics, status }) => (
 const FeedsPanel = ({ opportunities, trades }) => (
     <div className="panel feeds-panel">
         <div className="panel-title">Activity Feed</div>
-        {/* Render successful trades first */}
+        {trades.length === 0 && opportunities.length === 0 && <div className="feed-item">No activity yet.</div>}
         {trades.map((trade, index) => (
-            <div key={`trade-${index}`} className="feed-item">
+            <div key={`trade-${trade.txHash || index}`} className="feed-item">
                 <div className="feed-item-header">
                     <span>✅ Trade Executed</span>
                     <span className="feed-item-profit">+ {formatNumber(trade.estimatedProfit, 5)} {trade.loanToken}</span>
@@ -48,9 +48,8 @@ const FeedsPanel = ({ opportunities, trades }) => (
                 <a href={`https://basescan.org/tx/${trade.txHash}`} target="_blank" rel="noopener noreferrer">View on Basescan</a>
             </div>
         ))}
-        {/* Render opportunities */}
         {opportunities.map((opp, index) => (
-            <div key={`opp-${index}`} className="feed-item">
+            <div key={`opportunity-${index}`} className="feed-item">
                 <div className="feed-item-header">
                     <span>🔍 Opportunity Found</span>
                     <span className="feed-item-profit">+ {formatNumber(opp.estimatedProfit, 5)} {opp.loanToken}</span>
@@ -62,7 +61,7 @@ const FeedsPanel = ({ opportunities, trades }) => (
 );
 
 const LiveLogPanel = ({ logs }) => {
-    const logContainerRef = React.useRef(null);
+    const logContainerRef = useRef(null);
 
     useEffect(() => {
         if (logContainerRef.current) {
@@ -74,8 +73,9 @@ const LiveLogPanel = ({ logs }) => {
         <div className="panel log-panel">
             <div className="panel-title">Live Logs</div>
             <div className="log-container" ref={logContainerRef}>
+                {logs.length === 0 && <div className="log-entry">No logs yet. Waiting for new blocks...</div>}
                 {logs.map((log, index) => (
-                    <div key={index} className={`log-entry ${log.logLevel}`}>
+                    <div key={`log-${index}`} className={`log-entry ${log.logLevel}`}>
                         <span className="timestamp">{new Date(log.timestamp).toLocaleTimeString()}</span>
                         <span>{log.message}</span>
                     </div>
@@ -84,7 +84,6 @@ const LiveLogPanel = ({ logs }) => {
         </div>
     );
 };
-
 
 // --- Main Arbitrage Bot Page Component ---
 
@@ -105,35 +104,43 @@ const ArbitrageBotPage = () => {
         ws.onerror = () => setStatus({ isOnline: false });
 
         ws.onmessage = (event) => {
-            const message = JSON.parse(event.data);
+            try {
+                const message = JSON.parse(event.data);
+                if (message.type === 'bot-update') {
+                    const logEntry = message.data;
+                    setStructuredLogs(prev => [logEntry, ...prev].slice(0, 200));
 
-            if (message.type === 'bot-update') {
-                const logEntry = message.data;
-                setStructuredLogs(prev => [logEntry, ...prev].slice(0, 200));
-
-                switch (logEntry.event) {
-                    case 'BOT_STARTED':
-                    case 'BLOCK_SCAN':
-                        setBotMetrics(prev => ({ ...prev, currentBlock: logEntry.payload.blockNumber || prev.currentBlock }));
-                        break;
-                    case 'OPPORTUNITY_FOUND':
-                        setOpportunities(prev => [logEntry.payload, ...prev].slice(0, 10));
-                        break;
-                    case 'TRADE_SUCCESS':
-                        setSuccessfulTrades(prev => [logEntry.payload, ...prev]);
-                        setBotMetrics(prev => ({
-                            ...prev,
-                            pnl: prev.pnl + parseFloat(logEntry.payload.estimatedProfit),
-                            tradeCount: prev.tradeCount + 1
-                        }));
-                        // Clear opportunities after a successful trade to reduce clutter
-                        setOpportunities([]);
-                        break;
+                    switch (logEntry.event) {
+                        case 'BOT_STARTED':
+                        case 'BLOCK_SCAN':
+                            setBotMetrics(prev => ({ ...prev, currentBlock: logEntry.payload.blockNumber || prev.currentBlock }));
+                            break;
+                        case 'OPPORTUNITY_FOUND':
+                            setOpportunities(prev => [logEntry.payload, ...prev].slice(0, 10));
+                            break;
+                        case 'TRADE_SUCCESS':
+                            setSuccessfulTrades(prev => [logEntry.payload, ...prev]);
+                            setBotMetrics(prev => ({
+                                ...prev,
+                                pnl: prev.pnl + parseFloat(logEntry.payload.estimatedProfit),
+                                tradeCount: prev.tradeCount + 1
+                            }));
+                            setOpportunities([]);
+                            break;
+                        default:
+                            break;
+                    }
                 }
+            } catch (error) {
+                console.error("Failed to parse WebSocket message:", error);
             }
         };
 
-        return () => ws.close();
+        return () => {
+            if (ws.readyState === 1) { // 1 = OPEN
+                ws.close();
+            }
+        };
     }, []);
 
     return (

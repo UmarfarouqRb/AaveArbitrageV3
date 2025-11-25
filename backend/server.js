@@ -15,17 +15,14 @@ const port = process.env.PORT || 3001;
 const host = '0.0.0.0';
 
 // --- CORS Configuration ---
-const allowedOrigins = ['http://localhost:5173'];
-if (process.env.FRONTEND_URL) {
-  allowedOrigins.push(process.env.FRONTEND_URL);
-}
+const allowedOrigins = ['http://localhost:5173', process.env.FRONTEND_URL].filter(Boolean);
 
 const corsOptions = {
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error('This origin is not permitted by CORS policy.'));
     }
   }
 };
@@ -33,24 +30,38 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-const TRADE_HISTORY_FILE = path.join(__dirname, 'trade_history.json');
+// --- File Paths ---
 const MANUAL_TRADE_HISTORY_FILE = path.join(__dirname, 'manual_trade_history.json');
 const BOT_LOG_FILE = path.join(__dirname, 'bot.log');
 
-const logStream = fs.createWriteStream(BOT_LOG_FILE, { flags: 'a' });
-
 // --- Bot Process Management ---
-let botProcess;
+let botProcess = null;
+let isRestarting = false;
+
+function broadcast(message) {
+    if (!wss || !wss.clients) return;
+    const serializedMessage = JSON.stringify(message);
+    wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(serializedMessage);
+        }
+    });
+}
 
 function startBot() {
-    console.log('Starting arbitrage bot...');
+    if (botProcess) { // Ensure no multiple instances are running
+        console.log('Bot process is already running.');
+        return;
+    }
+    console.log('Starting the arbitrage bot process...');
+    isRestarting = false;
+
     botProcess = fork(path.join(__dirname, 'bot.js'), [], {
         stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
-        env: process.env
+        env: { ...process.env }
     });
 
-    botProcess.stdout.pipe(process.stdout);
-    botProcess.stderr.pipe(process.stderr);
+    const logStream = fs.createWriteStream(BOT_LOG_FILE, { flags: 'a' });
     botProcess.stdout.pipe(logStream);
     botProcess.stderr.pipe(logStream);
 
@@ -59,78 +70,42 @@ function startBot() {
     });
 
     botProcess.on('exit', (code) => {
-        console.error(`--- Bot process exited with code ${code}. ---`);
-        console.log('Restarting bot in 5 seconds...');
-        setTimeout(startBot, 5000);
+        console.error(`Bot process terminated unexpectedly with code: ${code}.`);
+        botProcess = null; // Clear the process handle
+        if (!isRestarting) {
+            isRestarting = true;
+            console.log('Attempting to restart bot in 5 seconds...');
+            setTimeout(startBot, 5000);
+        }
+    });
+
+    botProcess.on('error', (err) => {
+        console.error('Failed to start bot process:', err);
     });
 }
 
-startBot();
+function stopBot() {
+    if (botProcess) {
+        console.log('Gracefully stopping the arbitrage bot...');
+        botProcess.kill('SIGTERM'); // Send termination signal
+        botProcess = null;
+    }
+}
 
 // --- API Endpoints ---
-app.get('/api/status', (req, res) => {
-    res.json({ status: 'ok', message: 'Backend is running' });
-});
-
-app.get('/api/gas-price', async (req, res) => {
-    try {
-        const { network, strategy } = req.query;
-        const provider = getProvider(network, NETWORKS);
-        const gasPrice = await getGasPrice(provider, strategy);
-        res.json({ gasPrice: gasPrice.toString() });
-    } catch (error) {
-        console.error('Gas Price Error:', error);
-        res.status(500).json({ message: error.message || 'An unexpected error occurred while fetching gas price.' });
-    }
-});
-
-app.get('/api/logs', async (req, res) => {
-    try {
-        const data = await fs.promises.readFile(BOT_LOG_FILE, 'utf8');
-        const lines = data.trim().split('\n');
-        res.json(lines.slice(-100));
-    } catch (error) {
-        if (error.code === 'ENOENT') {
-            return res.json(['Log file not created yet.']);
-        }
-        console.error('Error reading log file:', error);
-        res.status(500).json({ message: 'Failed to read log file.' });
-    }
-});
-
-app.get('/api/trade-history', async (req, res) => {
-    try {
-        const data = await fs.promises.readFile(TRADE_HISTORY_FILE, 'utf8');
-        res.json(JSON.parse(data));
-    } catch (error) {
-        if (error.code === 'ENOENT') {
-            return res.json([]);
-        }
-        console.error('Error reading trade history:', error);
-        res.status(500).json({ message: 'Failed to read trade history.' });
-    }
-});
-
-app.get('/api/manual-trade-history', async (req, res) => {
-    try {
-        const data = await fs.promises.readFile(MANUAL_TRADE_HISTORY_FILE, 'utf8');
-        res.json(JSON.parse(data));
-    } catch (error) {
-        if (error.code === 'ENOENT') {
-            return res.json([]);
-        }
-        console.error('Error reading manual trade history:', error);
-        res.status(500).json({ message: 'Failed to read manual trade history.' });
-    }
-});
+app.get('/api/status', (req, res) => res.json({ status: 'ok', message: 'Backend is running' }));
 
 app.post('/api/manual-trade-history', async (req, res) => {
     try {
         const newTrade = req.body;
-        const tradeHistory = JSON.parse(await fs.promises.readFile(MANUAL_TRADE_HISTORY_FILE, 'utf8'));
+        let tradeHistory = [];
+        if (fs.existsSync(MANUAL_TRADE_HISTORY_FILE)) {
+            const data = await fs.promises.readFile(MANUAL_TRADE_HISTORY_FILE, 'utf8');
+            tradeHistory = JSON.parse(data);
+        }
         tradeHistory.push(newTrade);
         await fs.promises.writeFile(MANUAL_TRADE_HISTORY_FILE, JSON.stringify(tradeHistory, null, 2));
-        res.json({ message: 'Trade saved successfully' });
+        res.status(201).json({ message: 'Trade saved successfully.' });
     } catch (error) {
         console.error('Error saving manual trade:', error);
         res.status(500).json({ message: 'Failed to save manual trade.' });
@@ -139,41 +114,50 @@ app.post('/api/manual-trade-history', async (req, res) => {
 
 app.post('/api/simulate-trade', async (req, res) => {
     try {
-        const tradeParams = req.body;
-        const result = await simulateTrade(tradeParams);
+        const result = await simulateTrade(req.body);
         res.json(result);
     } catch (error) {
-        console.error('Simulation Error:', error);
+        console.error('Trade Simulation Error:', error);
         res.status(500).json({ message: error.message || 'An unexpected error occurred during simulation.' });
     }
 });
 
 app.post('/api/prepare-trade', async (req, res) => {
     try {
-        const tradeParams = req.body;
-        const unsignedTx = await prepareTrade(tradeParams);
+        const unsignedTx = await prepareTrade(req.body);
         res.json({ unsignedTx });
     } catch (error) {
         console.error('Trade Preparation Error:', error);
-        res.status(500).json({ message: error.message || 'An unexpected error occurred during trade preparation.' });
+        res.status(500).json({ message: error.message || 'An unexpected error occurred during preparation.' });
     }
 });
 
+// --- WebSocket Server ---
 const server = app.listen(port, host, () => {
-    console.log(`Backend server listening on ${host}:${port}`);
+    console.log(`Backend server is live at http://${host}:${port}`);
+    startBot();
 });
 
 const wss = new WebSocket.Server({ server });
 
 wss.on('connection', (ws) => {
-    console.log('Client connected to WebSocket');
-    ws.send(JSON.stringify({ type: 'status', data: { isOnline: true, message: 'Connected to server' } }));
+    console.log('A new client has connected via WebSocket.');
+    ws.send(JSON.stringify({ type: 'status', data: { isOnline: botProcess !== null, message: 'Successfully connected to the server.' } }));
 });
 
-function broadcast(message) {
-    wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(message));
-        }
+// --- Graceful Shutdown Handling ---
+const cleanup = () => {
+    console.log('Initiating graceful shutdown...');
+    stopBot();
+    server.close(() => {
+        console.log('HTTP server closed.');
+        process.exit(0);
     });
-}
+    setTimeout(() => {
+        console.error('Could not close connections in time, forcing shutdown.');
+        process.exit(1);
+    }, 10000); // Force exit after 10s
+};
+
+process.on('SIGTERM', cleanup);
+process.on('SIGINT', cleanup);

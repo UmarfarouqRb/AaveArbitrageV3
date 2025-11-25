@@ -11,7 +11,7 @@ const TOKEN_OPTIONS = ['USDC', 'WETH'];
 const initialState = {
   tokenA: TOKEN_OPTIONS[0],
   tokenB: '',
-  loanAmount: '1000',
+  loanAmount: '',
   dex1: DEX_OPTIONS[0],
   dex2: DEX_OPTIONS[1],
   isStable: true,
@@ -205,45 +205,47 @@ const ManualTradeV2 = () => {
             type="text"
             value={loanAmount}
             onChange={(e) => handleFieldChange('loanAmount', e.target.value)}
+            placeholder="1000"
           />
         </div>
 
         <div className="form-row">
-           <div className="volatile-swap-section">
-            <input
-              type="checkbox"
-              id="volatile-swap"
-              checked={!isStable}
-              onChange={(e) => handleFieldChange('isStable', !e.target.checked)}
-            />
-            <label htmlFor="volatile-swap">Volatile Swap</label>
-          </div>
-          <div className="dex-selection-section">
-            <div>
-              <label>DEX 1</label>
-              <select value={dex1} onChange={handleDex1Change}>
-                {DEX_OPTIONS.map((dex) => (
-                  <option key={dex} value={dex}>
-                    {dex}
-                  </option>
-                ))}
-              </select>
+            <div className="checkbox-container">
+                <input
+                type="checkbox"
+                id="volatile-swap"
+                checked={!isStable}
+                onChange={(e) => handleFieldChange('isStable', !e.target.checked)}
+                />
+                <label htmlFor="volatile-swap">Volatile Swap</label>
             </div>
-            <div>
-              <label>DEX 2</label>
-              <select value={dex2} onChange={(e) => handleFieldChange('dex2', e.target.value)}>
-                {DEX_OPTIONS.map((dex) => (
-                  <option key={dex} value={dex}>
-                    {dex}
-                  </option>
-                ))}
-              </select>
+
+            <div className="dex-selection-section">
+                <div>
+                <label>DEX 1</label>
+                <select value={dex1} onChange={handleDex1Change}>
+                    {DEX_OPTIONS.map((dex) => (
+                    <option key={dex} value={dex}>
+                        {dex}
+                    </option>
+                    ))}
+                </select>
+                </div>
+                <div>
+                <label>DEX 2</label>
+                <select value={dex2} onChange={(e) => handleFieldChange('dex2', e.target.value)}>
+                    {DEX_OPTIONS.map((dex) => (
+                    <option key={dex} value={dex}>
+                        {dex}
+                    </option>
+                    ))}
+                </select>
+                </div>
             </div>
-          </div>
         </div>
       </div>
 
-      <button onClick={handleSimulate} disabled={simulating || !tokenA || !tokenB || !loanAmount}>
+      <button onClick={handleSimulate} disabled={simulating || !tokenA || !tokenB || !loanAmount} className="button primary-action">
         {simulating ? 'Simulating...' : 'Simulate Trade'}
       </button>
 
@@ -273,7 +275,7 @@ const ManualTradeV2 = () => {
             </div>
           </div>
           {isTradeProfitable && (
-            <button onClick={handleExecuteTrade} disabled={loading}>
+            <button onClick={handleExecuteTrade} disabled={loading} className="button accent-action">
               {loading ? 'Executing...' : 'Execute Trade'}
             </button>
           )}

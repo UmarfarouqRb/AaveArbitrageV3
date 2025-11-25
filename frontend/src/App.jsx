@@ -5,7 +5,6 @@ import { usePrivy } from '@privy-io/react-auth';
 import './index.css';
 import ErrorBoundary from './components/ErrorBoundary';
 import TopNav from './components/TopNav';
-import SideNav from './components/SideNav';
 import LoginPagePrompt from './components/LoginPagePrompt';
 import ThemeSwitcher from './components/ThemeSwitcher';
 
@@ -20,7 +19,6 @@ const App = () => {
   // A wrapper for the authenticated user's view
   const AuthenticatedLayout = () => (
     <div className="container">
-        <SideNav />
         <main>
             <Suspense fallback={<div className="loading-container"><h2>Loading...</h2></div>}>
               <Routes>
@@ -41,12 +39,12 @@ const App = () => {
             <Link to="/">FlashBot</Link>
           </h1>
           <TopNav />
-          <div>
+          <div className="controls">
             <ThemeSwitcher />
             {ready && authenticated ? (
-              <button onClick={logout}>Logout</button>
+              <button onClick={logout} className="button">Logout</button>
             ) : (
-              <button onClick={login}>Login</button>
+              <button onClick={login} className="button primary-action">Login</button>
             )}
           </div>
         </header>
