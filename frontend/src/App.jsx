@@ -1,11 +1,13 @@
+
 import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { usePrivy } from '@privy-io/react-auth';
-import './components.css';
+import './index.css';
 import ErrorBoundary from './components/ErrorBoundary';
 import TopNav from './components/TopNav';
 import SideNav from './components/SideNav';
 import LoginPagePrompt from './components/LoginPagePrompt';
+import ThemeSwitcher from './components/ThemeSwitcher';
 
 // Lazy load the pages
 const ArbitrageBotPage = lazy(() => import('./pages/ArbitrageBotPage'));
@@ -20,7 +22,6 @@ const App = () => {
     <div className="container">
         <SideNav />
         <main>
-            <TopNav />
             <Suspense fallback={<div className="loading-container"><h2>Loading...</h2></div>}>
               <Routes>
                 <Route path="/" element={<ManualTradePage />} />
@@ -39,7 +40,9 @@ const App = () => {
           <h1>
             <Link to="/">FlashBot</Link>
           </h1>
+          <TopNav />
           <div>
+            <ThemeSwitcher />
             {ready && authenticated ? (
               <button onClick={logout}>Logout</button>
             ) : (
@@ -56,6 +59,9 @@ const App = () => {
           )}
         </ErrorBoundary>
 
+        <footer>
+          powered by forge inc
+        </footer>
       </div>
     </Router>
   );

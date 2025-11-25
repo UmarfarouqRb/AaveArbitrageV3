@@ -4,6 +4,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const { fork } = require('child_process');
+const WebSocket = require('ws');
 const { prepareTrade } = require('./prepare-trade');
 const { simulateTrade } = require('./simulate-trade');
 const { getProvider, getGasPrice } = require('./utils');
@@ -38,26 +39,35 @@ const BOT_LOG_FILE = path.join(__dirname, 'bot.log');
 
 const logStream = fs.createWriteStream(BOT_LOG_FILE, { flags: 'a' });
 
-// --- Bot Process Management (Restart Disabled) ---
-console.log('Starting arbitrage bot...');
-const botProcess = fork(path.join(__dirname, 'bot.js'), [], {
-    stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
-    env: process.env
-});
+// --- Bot Process Management ---
+let botProcess;
 
-botProcess.stdout.pipe(process.stdout);
-botProcess.stderr.pipe(process.stderr);
-botProcess.stdout.pipe(logStream);
-botProcess.stderr.pipe(logStream);
+function startBot() {
+    console.log('Starting arbitrage bot...');
+    botProcess = fork(path.join(__dirname, 'bot.js'), [], {
+        stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+        env: process.env
+    });
 
-botProcess.on('exit', (code) => {
-    console.error(`--- Bot process exited with code ${code}. Automatic restart is disabled. ---`);
-    console.error('Investigate the bot logs for the root cause of the failure.');
-});
+    botProcess.stdout.pipe(process.stdout);
+    botProcess.stderr.pipe(process.stderr);
+    botProcess.stdout.pipe(logStream);
+    botProcess.stderr.pipe(logStream);
 
+    botProcess.on('message', (message) => {
+        broadcast(message);
+    });
+
+    botProcess.on('exit', (code) => {
+        console.error(`--- Bot process exited with code ${code}. ---`);
+        console.log('Restarting bot in 5 seconds...');
+        setTimeout(startBot, 5000);
+    });
+}
+
+startBot();
 
 // --- API Endpoints ---
-
 app.get('/api/status', (req, res) => {
     res.json({ status: 'ok', message: 'Backend is running' });
 });
@@ -138,7 +148,7 @@ app.post('/api/simulate-trade', async (req, res) => {
     }
 });
 
-app.post('/api/prepare-manual-trade', async (req, res) => {
+app.post('/api/prepare-trade', async (req, res) => {
     try {
         const tradeParams = req.body;
         const unsignedTx = await prepareTrade(tradeParams);
@@ -149,6 +159,21 @@ app.post('/api/prepare-manual-trade', async (req, res) => {
     }
 });
 
-app.listen(port, host, () => {
+const server = app.listen(port, host, () => {
     console.log(`Backend server listening on ${host}:${port}`);
 });
+
+const wss = new WebSocket.Server({ server });
+
+wss.on('connection', (ws) => {
+    console.log('Client connected to WebSocket');
+    ws.send(JSON.stringify({ type: 'status', data: { isOnline: true, message: 'Connected to server' } }));
+});
+
+function broadcast(message) {
+    wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify(message));
+        }
+    });
+}

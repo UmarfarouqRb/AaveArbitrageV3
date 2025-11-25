@@ -1,33 +1,44 @@
+
 :root[data-theme='dark'] {
   --background: #1a1a1a;
+  --background-gradient-start: #1e1e1e;
+  --background-gradient-end: #121212;
   --text-primary: #ffffff;
   --text-secondary: #a0a0a0;
   --border-color: #333333;
   --card-background: #2a2a2a;
+  --header-background: rgba(26, 26, 26, 0.8);
   --primary-button-bg: #007bff;
   --primary-button-text: #ffffff;
   --primary-button-hover-bg: #0056b3;
-  --accent-bg: #ff4d4d;
-  --accent-text: #ffffff;
-  --accent-hover-bg: #cc0000;
+  --accent-color: #FF8C00;
+  --accent-color-text: #ffffff;
+  --accent-color-hover: #E07B00;
   --success-color: #28a745;
   --error-color: #dc3545;
+  --success-border: rgba(40, 167, 69, 0.5);
+  --error-border: rgba(220, 53, 69, 0.5);
 }
 
 :root[data-theme='light'] {
   --background: #ffffff;
+  --background-gradient-start: #f5f5f5;
+  --background-gradient-end: #ffffff;
   --text-primary: #000000;
   --text-secondary: #555555;
   --border-color: #dddddd;
   --card-background: #f5f5f5;
+  --header-background: rgba(255, 255, 255, 0.8);
   --primary-button-bg: #007bff;
   --primary-button-text: #ffffff;
   --primary-button-hover-bg: #0056b3;
-  --accent-bg: #ff4d4d;
-  --accent-text: #ffffff;
-  --accent-hover-bg: #cc0000;
+  --accent-color: #FF8C00;
+  --accent-color-text: #ffffff;
+  --accent-color-hover: #E07B00;
   --success-color: #28a745;
   --error-color: #dc3545;
+  --success-border: rgba(40, 167, 69, 0.5);
+  --error-border: rgba(220, 53, 69, 0.5);
 }
 
 body {
@@ -37,74 +48,48 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--background);
+  background: linear-gradient(180deg, var(--background-gradient-start), var(--background-gradient-end)) no-repeat;
   color: var(--text-primary);
 }
 
-body[data-theme='dark'] {
-  background-color: #1a1a1a;
-  color: #ffffff;
-}
-
-body[data-theme='light'] {
-  background-color: #ffffff;
-  color: #000000;
-}
-
 #app-container {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
-  background-color: var(--background);
   font-family: sans-serif;
   color: var(--text-primary);
 }
 
 header {
+  position: sticky;
+  top: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
+  padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--border-color);
+  background-color: var(--header-background);
+  backdrop-filter: blur(10px);
+  z-index: 1000;
 }
 
 header h1 {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.25rem;
+  font-weight: 600;
 }
 
 header button {
-  font-weight: bold;
+  font-weight: 500;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
-  transition: background-color 200ms;
-}
-
-header button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-header button.bg-accent-bg {
-  background-color: var(--accent-bg);
-  color: var(--accent-text);
-}
-
-header button.bg-accent-bg:hover {
-  background-color: var(--accent-hover-bg);
-}
-
-header button.bg-primary-button-bg {
-  background-color: var(--primary-button-bg);
-  color: var(--primary-button-text);
-}
-
-header button.bg-primary-button-bg:hover {
-  background-color: var(--primary-button-hover-bg);
+  transition: all 0.2s ease-in-out;
 }
 
 .container {
   width: 100%;
   margin: 1.5rem auto 0;
   padding: 0 1rem;
+  flex-grow: 1; /* Ensures content pushes footer down */
 }
 
 .loading-container {
@@ -116,278 +101,42 @@ header button.bg-primary-button-bg:hover {
   color: var(--text-secondary);
 }
 
-.login-prompt-container {
-  background-color: var(--card-background);
-  border: 1px solid var(--border-color);
-  border-radius: 0.5rem;
-  max-width: 28rem;
-  margin: 2.5rem auto 0;
-  padding: 2rem;
-  text-align: center;
-}
-
-.login-prompt-container h2 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
-  color: var(--text-primary);
-}
-
-.login-prompt-container p {
-  color: var(--text-secondary);
-  margin-bottom: 1.5rem;
-}
-
-.login-prompt-container button {
-  width: 100%;
-  font-weight: bold;
-  padding: 0.75rem 1rem;
-  border-radius: 0.75rem;
-  transition: background-color 200ms;
-  font-size: 1.125rem;
-  background-color: var(--primary-button-bg);
-  color: var(--primary-button-text);
-}
-
-.login-prompt-container button:hover {
-  background-color: var(--primary-button-hover-bg);
-}
-
-.arbitrage-bot-container {
-  padding: 20px;
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.controller-header h3 {
-  color: #333;
-  text-align: center;
-}
-
-.page-description {
-  text-align: center;
-  color: #666;
-  margin-bottom: 20px;
-}
-
-.arbitrage-bot-controller-centered {
-  display: flex;
-  justify-content: center;
-  padding: 20px;
-}
-
-.bot-container {
-  background-color: #f9f9f9;
-  border: 1px solid #eee;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  width: 100%;
-  max-width: 600px;
-}
-
-.controller-header h3 {
-  margin-bottom: 15px;
-}
-
-.status-section p, .log-info p {
-  margin: 10px 0;
-  color: #555;
-  font-size: 0.9em;
-}
-
-.status-indicator {
-  margin: 20px 0;
-}
-
-.status-indicator h4 {
-  color: #333;
-  font-size: 1.1em;
-}
-
-.bot-logs-container {
-  margin-top: 20px;
-  background-color: #f9f9f9;
-  border: 1px solid #eee;
-  padding: 15px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-
-.logs-header {
-  color: #333;
-  margin-bottom: 10px;
-}
-
-.logs-content {
-  height: 300px;
-  overflow-y: auto;
-  background-color: #fff;
-  border: 1px solid #ddd;
-  padding: 10px;
-  border-radius: 4px;
-}
-
-.log-entry {
-  display: flex;
-  margin-bottom: 5px;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 0.9em;
-}
-
-.log-timestamp {
-  color: #888;
-  margin-right: 10px;
-}
-
-.log-message {
-  color: #333;
-}
-
-.trade-history-container {
-  padding: 20px;
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.trade-history-container h2 {
-  color: #333;
-  text-align: center;
-}
-
-.trade-list {
-  list-style: none;
-  padding: 0;
-}
-
-.trade-item {
-  background: #f9f9f9;
-  border: 1px solid #eee;
-  padding: 15px;
-  margin-bottom: 10px;
-  border-radius: 4px;
-}
-
-.input-data {
-  background-color: #f0f0f0;
-  padding: 10px;
-  border-radius: 4px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 0.85em;
-  margin-top: 10px;
-}
-
-#trade-history-container {
-  padding: 2rem;
-  background-color: var(--card-background);
-  border: 1px solid var(--border-color);
-  border-radius: 0.5rem;
-  color: var(--text-primary);
-}
-
-#trade-history-section {
-  margin-bottom: 2rem;
-}
-
-#trade-history-section h3 {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: 0.5rem;
-}
-
-#empty-state {
-  text-align: center;
-  padding: 2rem;
-  background-color: var(--background);
-  border: 1px dashed var(--border-color);
-  border-radius: 0.5rem;
-}
-
-#table-responsive {
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th, td {
-  padding: 0.75rem 1rem;
-  text-align: left;
-  border-bottom: 1px solid var(--border-color);
-}
-
-th {
-  font-weight: 700;
-  background-color: var(--background);
-}
-
-tbody tr:last-child td {
-  border-bottom: none;
-}
-
-tbody tr:nth-child(even) {
-  background-color: var(--background);
-}
-
-.status-success {
-  color: #28a745;
-  font-weight: 700;
-}
-
-.status-failed {
-  color: #dc3545;
-  font-weight: 700;
-}
-
-#loading-message, #error-message {
-  text-align: center;
-  padding: 2rem;
-  background-color: var(--card-background);
-  border: 1px solid var(--border-color);
-  border-radius: 0.5rem;
-}
-
-#error-message {
-  color: #dc3545;
-}
-
-#manual-trade-container {
+.manual-trade-container {
   max-width: 36rem;
-  margin: 0 auto;
+  margin: 2rem auto;
   background-color: var(--card-background);
-  padding: 1rem 1.5rem;
+  padding: 2rem;
   border-radius: 1rem;
   border: 1px solid var(--border-color);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease-in-out;
 }
 
-#manual-trade-header {
-  font-size: 1.25rem;
+.manual-trade-header {
+  font-size: 1.5rem;
   font-weight: 700;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
   color: var(--text-primary);
 }
 
-#token-input-section-a, #token-input-section-b, #loan-amount-section {
+.form-section .form-row {
   background-color: var(--background);
   padding: 1rem;
   border-radius: 0.75rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 1rem;
+  transition: background-color 0.2s ease-in-out;
 }
 
-#token-input-section-a label, #token-input-section-b label, #loan-amount-section label {
-  font-size: 0.75rem;
+.form-section .form-row:hover {
+  background-color: rgba(0,0,0,0.1);
+}
+
+.form-section .form-row label {
+  font-size: 0.8rem;
   color: var(--text-secondary);
 }
 
-#token-input-section-a input, #token-input-section-b input, #loan-amount-section input {
+.form-section .form-row input, .form-section .form-row select {
   width: 100%;
   background-color: transparent;
   font-size: 1.5rem;
@@ -397,145 +146,316 @@ tbody tr:nth-child(even) {
   outline: none;
 }
 
-#dex-selection-section {
+.form-section .form-row input:focus, .form-section .form-row select:focus {
+  outline: 2px solid var(--primary-button-bg);
+}
+
+.dex-selection-section {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
   margin-bottom: 1rem;
 }
 
-#dex-selection-section div {
+.dex-selection-section div {
   background-color: var(--background);
   padding: 0.75rem;
   border-radius: 0.75rem;
 }
 
-#dex-selection-section label {
+.dex-selection-section label {
   font-size: 0.75rem;
   color: var(--text-secondary);
 }
 
-#dex-selection-section select {
-  width: 100%;
-  background-color: transparent;
-  color: var(--text-primary);
-  border: none;
-  outline: none;
-}
-
-#volatile-swap-section {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 1.5rem;
-}
-
-#volatile-swap-section input {
-  height: 1rem;
-  width: 1rem;
-  border-radius: 0.25rem;
-  border-color: var(--border-color);
-  color: var(--primary-button-bg);
-}
-
-#volatile-swap-section label {
-  margin-left: 0.5rem;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
-
-#simulate-trade-button, #execute-trade-button {
+.manual-trade-container button {
   width: 100%;
   font-weight: 700;
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1rem;
   border-radius: 0.75rem;
-  transition: background-color 200ms;
+  transition: all 200ms ease-in-out;
   font-size: 1.125rem;
+  box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2);
 }
 
-#simulate-trade-button:disabled, #execute-trade-button:disabled {
-  opacity: 0.5;
+.manual-trade-container button:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
-#simulate-trade-button {
+.manual-trade-container > button {
   background-color: var(--primary-button-bg);
   color: var(--primary-button-text);
 }
 
-#simulate-trade-button:hover {
+.manual-trade-container > button:hover:not(:disabled) {
   background-color: var(--primary-button-hover-bg);
+  transform: translateY(-2px);
 }
 
-#execute-trade-button {
-  background-color: var(--accent-bg);
-  color: var(--accent-text);
+.simulation-result-container button {
+  background-color: var(--accent-color);
+  color: var(--accent-color-text);
   margin-top: 1rem;
 }
 
-#execute-trade-button:hover {
-  background-color: var(--accent-hover-bg);
+.simulation-result-container button:hover {
+  background-color: var(--accent-color-hover);
 }
 
-#simulation-error, #execution-error {
+.error-message {
   color: var(--error-color);
   margin-top: 1rem;
   text-align: center;
 }
 
-#simulation-result-container, #result-container {
+.simulation-result-container {
   margin-top: 1.5rem;
   padding: 1rem;
   background-color: var(--background);
   border-radius: 0.75rem;
+  border: 2px solid transparent;
+  transition: border-color 0.3s;
 }
 
-#simulation-result-container h3 {
+.profit-border {
+  border-color: var(--success-border);
+}
+
+.loss-border {
+  border-color: var(--error-border);
+}
+
+.simulation-result-container h3 {
   font-weight: 700;
   font-size: 1.125rem;
   color: var(--text-primary);
   margin-bottom: 0.5rem;
 }
 
-#simulation-result-container div div {
+.simulation-result-container div div {
   display: flex;
   justify-content: space-between;
   font-size: 0.875rem;
 }
 
-#simulation-result-container div div span:first-child {
+.simulation-result-container div div span:first-child {
   color: var(--text-secondary);
 }
 
-.text-success-color {
+.text-success {
   color: var(--success-color);
+  font-weight: bold;
 }
 
-.text-error-color {
+.text-error {
   color: var(--error-color);
+  font-weight: bold;
 }
 
-#result-container {
+.result-container {
   text-align: center;
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background-color: var(--background);
+  border-radius: 0.75rem;
 }
 
-#result-container p {
+.result-container p {
   font-weight: 700;
   font-size: 1.125rem;
 }
 
-#result-container a {
+.result-container a {
   color: var(--primary-button-bg);
   text-decoration: underline;
   margin-top: 0.5rem;
   display: inline-block;
 }
 
-.theme-switcher {
-  background-color: transparent;
+.token-input-container {
+  position: relative;
+}
+
+.paste-icon-button {
+  position: absolute;
+  top: 50%;
+  right: 1rem;
+  transform: translateY(-50%);
+  background: transparent;
   border: none;
-  color: var(--text-primary);
   cursor: pointer;
+  padding: 0.5rem;
+}
+
+.paste-icon-button svg {
+  fill: var(--text-secondary);
+  transition: fill 200ms;
+}
+
+.paste-icon-button:hover svg {
+  fill: var(--text-primary);
+}
+
+select {
+  background-color: #2c2c2c;
+  color: #ffffff;
+  border: 1px solid #444;
+  border-radius: 5px;
+  padding: 10px;
+  font-size: 16px;
+  width: 100%;
+  box-sizing: border-box;
+  appearance: none;
+  background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23ffffff"><path d="M7 10l5 5 5-5z"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 20px;
+}
+
+select option {
+  background-color: #2c2c2c;
+  color: #ffffff;
+}
+
+input[type="checkbox"] {
+  appearance: none;
+  background-color: #2c2c2c;
+  border: 1px solid #444;
+  border-radius: 3px;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  position: relative;
+  top: 5px;
+}
+
+input[type="checkbox"]:checked {
+  background-color: #007bff;
+}
+
+input[type="checkbox"]:checked::after {
+  content: '\2713';
+  color: #ffffff;
+  font-size: 14px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+
+/* Arbitrage Bot Section */
+.arbitrage-bot-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 2rem;
+  padding: 2rem;
+}
+
+.bot-module {
+  background-color: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+.bot-module h2 {
   font-size: 1.25rem;
-  padding: 0;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.bot-controls .control-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.bot-controls .status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bot-controls .status-light {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: var(--text-secondary);
+}
+
+.bot-controls .status-light.active {
+  background-color: var(--success-color);
+}
+
+.bot-controls button {
+  padding: 0.6rem 1.2rem;
+  font-weight: bold;
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+
+.bot-live-logs {
+  flex-grow: 1;
+}
+
+.bot-logs-container {
+  background-color: var(--background);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  height: 250px;
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 0.875rem;
+}
+
+.bot-logs-container .log-message {
+  margin-bottom: 0.5rem;
+}
+
+.bot-logs-container .log-opportunity {
+  color: var(--accent-color);
+}
+
+.bot-logs-container .log-error {
+  color: var(--error-color);
+}
+
+.bot-trade-history table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.bot-trade-history th, .bot-trade-history td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.bot-trade-history th {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.bot-trade-history .status-success {
+  color: var(--success-color);
+}
+
+.bot-trade-history .status-failed {
+  color: var(--error-color);
+}
+
+footer {
+  text-align: center;
+  padding: 1.5rem;
+  margin-top: auto;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
 }

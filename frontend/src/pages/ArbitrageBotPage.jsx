@@ -1,73 +1,148 @@
-import React, { useState, useEffect } from 'react';
-import ArbitrageBotController from '../components/ArbitrageBotController';
-import BotLogs from '../components/BotLogs';
-import TradeHistory from '../components/TradeHistory';
-import TokenDisplay from '../components/TokenDisplay';
+import React, { useState, useEffect, useMemo } from 'react';
+
+// Helper to format numbers with commas
+const formatNumber = (num, decimals = 2) => {
+    const value = parseFloat(num);
+    if (isNaN(value)) return '0.00';
+    return value.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+};
+
+// --- Sub-components for the Dashboard ---
+
+const MetricCard = ({ title, value, children }) => (
+    <div className="metric-card">
+        <div className="metric-card-title">{title}</div>
+        <div className="metric-card-value">{children || value}</div>
+    </div>
+);
+
+const BotStatus = ({ isOnline }) => (
+    <div className="status-indicator">
+        <div className={`status-dot ${isOnline ? 'online' : ''}`}></div>
+        <span>{isOnline ? 'Online' : 'Offline'}</span>
+    </div>
+);
+
+const DashboardPanel = ({ metrics, status }) => (
+    <div className="panel dashboard-panel">
+        <MetricCard title="Bot Status">
+            <BotStatus isOnline={status.isOnline} />
+        </MetricCard>
+        <MetricCard title="Current Block" value={metrics.currentBlock} />
+        <MetricCard title="Total Profit (ETH)" value={`Ξ ${formatNumber(metrics.pnl, 5)}`} />
+        <MetricCard title="Trades Executed" value={metrics.tradeCount} />
+    </div>
+);
+
+const FeedsPanel = ({ opportunities, trades }) => (
+    <div className="panel feeds-panel">
+        <div className="panel-title">Activity Feed</div>
+        {/* Render successful trades first */}
+        {trades.map((trade, index) => (
+            <div key={`trade-${index}`} className="feed-item">
+                <div className="feed-item-header">
+                    <span>✅ Trade Executed</span>
+                    <span className="feed-item-profit">+ {formatNumber(trade.estimatedProfit, 5)} {trade.loanToken}</span>
+                </div>
+                <div>Path: {trade.path}</div>
+                <a href={`https://basescan.org/tx/${trade.txHash}`} target="_blank" rel="noopener noreferrer">View on Basescan</a>
+            </div>
+        ))}
+        {/* Render opportunities */}
+        {opportunities.map((opp, index) => (
+            <div key={`opp-${index}`} className="feed-item">
+                <div className="feed-item-header">
+                    <span>🔍 Opportunity Found</span>
+                    <span className="feed-item-profit">+ {formatNumber(opp.estimatedProfit, 5)} {opp.loanToken}</span>
+                </div>
+                <div>Path: {opp.path} | Loan: {formatNumber(opp.loanAmount)} {opp.loanToken}</div>
+            </div>
+        ))}
+    </div>
+);
+
+const LiveLogPanel = ({ logs }) => {
+    const logContainerRef = React.useRef(null);
+
+    useEffect(() => {
+        if (logContainerRef.current) {
+            logContainerRef.current.scrollTop = 0;
+        }
+    }, [logs]);
+
+    return (
+        <div className="panel log-panel">
+            <div className="panel-title">Live Logs</div>
+            <div className="log-container" ref={logContainerRef}>
+                {logs.map((log, index) => (
+                    <div key={index} className={`log-entry ${log.logLevel}`}>
+                        <span className="timestamp">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                        <span>{log.message}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+
+// --- Main Arbitrage Bot Page Component ---
 
 const ArbitrageBotPage = () => {
-  const [status, setStatus] = useState('Connecting...');
-  const [logs, setLogs] = useState([]);
-  const [trades, setTrades] = useState([]);
-  const [currentToken, setCurrentToken] = useState(null);
-  const [currentAmount, setCurrentAmount] = useState(null);
+    const [status, setStatus] = useState({ isOnline: false });
+    const [botMetrics, setBotMetrics] = useState({ currentBlock: 0, pnl: 0, tradeCount: 0 });
+    const [structuredLogs, setStructuredLogs] = useState([]);
+    const [opportunities, setOpportunities] = useState([]);
+    const [successfulTrades, setSuccessfulTrades] = useState([]);
 
-  useEffect(() => {
-    const wsUrl = `ws://${window.location.host}`;
-    const ws = new WebSocket(wsUrl);
+    useEffect(() => {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const wsUrl = `${wsProtocol}://${window.location.host.split(':')[0]}:3001`;
+        const ws = new WebSocket(wsUrl);
 
-    ws.onopen = () => {
-      setStatus('Online');
-      setLogs(prev => [...prev, 'Connected to bot server.']);
-    };
+        ws.onopen = () => setStatus({ isOnline: true });
+        ws.onclose = () => setStatus({ isOnline: false });
+        ws.onerror = () => setStatus({ isOnline: false });
 
-    ws.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      switch (message.type) {
-        case 'status':
-          setStatus(message.data.isOnline ? 'Online' : 'Offline');
-          break;
-        case 'log':
-          setLogs(prev => [...prev, message.data]);
-          break;
-        case 'trade':
-          setTrades(prev => [message.data, ...prev]);
-          setCurrentToken(message.data.token);
-          setCurrentAmount(message.data.amount);
-          break;
-        default:
-          break;
-      }
-    };
+        ws.onmessage = (event) => {
+            const message = JSON.parse(event.data);
 
-    ws.onclose = () => {
-      setStatus('Offline');
-      setLogs(prev => [...prev, 'Disconnected from bot server.']);
-    };
+            if (message.type === 'bot-update') {
+                const logEntry = message.data;
+                setStructuredLogs(prev => [logEntry, ...prev].slice(0, 200));
 
-    ws.onerror = (error) => {
-        setStatus('Error');
-        setLogs(prev => [...prev, `WebSocket Error: ${error.message}`]);
-    }
+                switch (logEntry.event) {
+                    case 'BOT_STARTED':
+                    case 'BLOCK_SCAN':
+                        setBotMetrics(prev => ({ ...prev, currentBlock: logEntry.payload.blockNumber || prev.currentBlock }));
+                        break;
+                    case 'OPPORTUNITY_FOUND':
+                        setOpportunities(prev => [logEntry.payload, ...prev].slice(0, 10));
+                        break;
+                    case 'TRADE_SUCCESS':
+                        setSuccessfulTrades(prev => [logEntry.payload, ...prev]);
+                        setBotMetrics(prev => ({
+                            ...prev,
+                            pnl: prev.pnl + parseFloat(logEntry.payload.estimatedProfit),
+                            tradeCount: prev.tradeCount + 1
+                        }));
+                        // Clear opportunities after a successful trade to reduce clutter
+                        setOpportunities([]);
+                        break;
+                }
+            }
+        };
 
-    return () => {
-      ws.close();
-    };
-  }, []);
+        return () => ws.close();
+    }, []);
 
-  return (
-    <div className="arbitrage-bot-container">
-      <div className="controller-header">
-        <h3>Arbitrage Bot</h3>
-        <p className="page-description">
-          Live status and activity of the automated arbitrage bot.
-        </p>
-      </div>
-      <ArbitrageBotController status={status} />
-      {currentToken && currentAmount && <TokenDisplay token={currentToken} amount={currentAmount} />}
-      <BotLogs logs={logs} />
-      <TradeHistory trades={trades} />
-    </div>
-  );
+    return (
+        <div className="bot-page-container">
+            <DashboardPanel metrics={botMetrics} status={status} />
+            <FeedsPanel opportunities={opportunities} trades={successfulTrades} />
+            <LiveLogPanel logs={structuredLogs} />
+        </div>
+    );
 };
 
 export default ArbitrageBotPage;

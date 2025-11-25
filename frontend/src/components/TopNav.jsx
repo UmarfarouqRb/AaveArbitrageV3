@@ -1,6 +1,5 @@
 
 import { NavLink } from 'react-router-dom';
-import ThemeSwitcher from './ThemeSwitcher';
 
 const TopNav = () => {
   const activeLinkClass = "bg-card-background text-text-primary";
@@ -26,7 +25,6 @@ const TopNav = () => {
         >
             Trade History
         </NavLink>
-        <ThemeSwitcher />
     </nav>
   );
 };

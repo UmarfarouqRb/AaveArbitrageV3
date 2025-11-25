@@ -1,9 +1,9 @@
 
-import ManualTrade from '../components/ManualTrade';
+import ManualTradeV2 from '../components/ManualTradeV2';
 
 const ManualTradePage = () => {
   return (
-    <ManualTrade />
+    <ManualTradeV2 />
   );
 };
 

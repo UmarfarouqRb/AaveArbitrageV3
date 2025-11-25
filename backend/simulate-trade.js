@@ -1,54 +1,97 @@
 const { getProvider, getGasPrice } = require('./utils');
-const { NETWORKS, BOT_CONFIG, TOKENS, TOKEN_DECIMALS } = require('./config');
+const { NETWORKS, BOT_CONFIG, TOKENS, TOKEN_DECIMALS, WRAPPED_NATIVE_CURRENCY } = require('./config');
 const { findBestPath } = require('./services');
 const { Contract, parseUnits, formatUnits } = require('ethers');
 const { AAVE_ARBITRAGE_V3_ABI } = require('./abi');
 
+
+async function getNativeTokenPriceInToken(network, provider, loanTokenAddress) {
+    const nativeAddress = WRAPPED_NATIVE_CURRENCY[network].address;
+    if (loanTokenAddress.toLowerCase() === nativeAddress.toLowerCase()) {
+        return 1.0; // Price is 1:1 if loan token is the native currency
+    }
+
+    try {
+        // Use a stablecoin as a bridge for price calculation, e.g., USDC
+        const usdcAddress = TOKENS[network].USDC;
+        if (!usdcAddress) throw new Error('USDC address not configured for this network.');
+
+        // Find path from 1 Native Token to USDC
+        const nativeToUsdcPath = await findBestPath(nativeAddress, usdcAddress, parseUnits('1', 18), provider, ['PancakeSwap', 'Aerodrome']);
+        if (!nativeToUsdcPath || nativeToUsdcPath.amountOut === 0n) return null;
+        const usdcAmount = nativeToUsdcPath.amountOut;
+        
+        // Find path from Loan Token to USDC
+        const loanTokenDecimals = TOKEN_DECIMALS[network][Object.keys(TOKENS[network]).find(key => TOKENS[network][key] === loanTokenAddress)];
+        const loanTokenToUsdcPath = await findBestPath(loanTokenAddress, usdcAddress, parseUnits('1', loanTokenDecimals), provider, ['PancakeSwap', 'Aerodrome']);
+        if (!loanTokenToUsdcPath || loanTokenToUsdcPath.amountOut === 0n) return null;
+        const usdcPerLoanToken = loanTokenToUsdcPath.amountOut;
+
+        // The price is the ratio of their values in USDC
+        // (Value of 1 Native in USDC) / (Value of 1 Loan Token in USDC)
+        const price = parseFloat(formatUnits(usdcAmount, 6)) / parseFloat(formatUnits(usPerLoanToken, 6));
+        
+        return price;
+
+    } catch (error) {
+        console.error("Error fetching native token price:", error);
+        // As a fallback, you could use a hardcoded or less reliable price source
+        return null; // Indicate that price could not be fetched
+    }
+}
+
+
 async function simulateTrade(tradeParams) {
-    const { network, tokenA, tokenB, dex1, dex2, loanAmount } = tradeParams;
+    const { network, tokenA, tokenB, amount, dex1, dex2, isStable } = tradeParams;
 
     const provider = getProvider(network, NETWORKS);
-    const tokenADecimals = TOKEN_DECIMALS.base[Object.keys(TOKENS.base).find(key => TOKENS.base[key] === tokenA)];
-    const loanAmountBigInt = parseUnits(loanAmount, tokenADecimals);
+    const tokenADecimals = TOKEN_DECIMALS[network][Object.keys(TOKENS[network]).find(key => TOKENS[network][key] === tokenA)];
+    if (!tokenADecimals) {
+        throw new Error(`Decimals not found for token: ${tokenA} on network ${network}`);
+    }
+    const loanAmountBigInt = parseUnits(amount, tokenADecimals);
 
-    // 1. Simulate the first leg of the arbitrage (A -> B)
-    const path1 = await findBestPath(tokenA, tokenB, loanAmountBigInt, provider, [dex1]);
+    // 1. Simulate the full arbitrage path
+    const path1 = await findBestPath(tokenA, tokenB, loanAmountBigInt, provider, [dex1], isStable);
     if (!path1 || path1.amountOut === 0n) {
-        throw new Error(`No path found for ${tokenA} -> ${tokenB} on ${dex1}`);
+        throw new Error(`No profitable path found for ${tokenA} -> ${tokenB} on ${dex1}`);
     }
     const amountB = path1.amountOut;
 
-    // 2. Simulate the second leg of the arbitrage (B -> A)
-    const path2 = await findBestPath(tokenB, tokenA, amountB, provider, [dex2]);
+    const path2 = await findBestPath(tokenB, tokenA, amountB, provider, [dex2], isStable);
     if (!path2 || path2.amountOut === 0n) {
-        throw new Error(`No path found for ${tokenB} -> ${tokenA} on ${dex2}`);
+        throw new Error(`No profitable path found for ${tokenB} -> ${tokenA} on ${dex2}`);
     }
     const finalAmountA = path2.amountOut;
 
-    // 3. Calculate gross profit
+    // 2. Calculate Gross Profit in terms of the loan token
     const grossProfit = finalAmountA - loanAmountBigInt;
-    const grossProfitFormatted = formatUnits(grossProfit, tokenADecimals);
 
-    // 4. Estimate gas cost
-    const arbitrageBot = new Contract(BOT_CONFIG.ARBITRAGE_CONTRACT_ADDRESS, AAVE_ARBITRAGE_V3_ABI, provider);
+    // 3. Estimate Gas Cost
     const gasPrice = await getGasPrice(provider, BOT_CONFIG.GAS_PRICE_STRATEGY);
-    
-    // We can't get a perfect gas estimate without building the full transaction,
-    // but we can use a historical or configured average for simulation purposes.
-    const estimatedGasLimit = BigInt(BOT_CONFIG.GAS_LIMIT); 
-    const estimatedGasCost = estimatedGasLimit * gasPrice;
-    const estimatedGasCostFormatted = formatUnits(estimatedGasCost, 18); // Gas is in ETH
+    const estimatedGasLimit = BigInt(BOT_CONFIG.GAS_LIMIT_MANUAL_TRADE); 
+    const estimatedGasCostNative = estimatedGasLimit * gasPrice; // This is in the native currency (e.g., ETH)
 
-    // 5. Calculate net profit
-    // Note: This is a simplified calculation. A more precise one would convert profit to ETH.
-    // For now, we show profit in the loan token and gas in ETH.
-    
+    // 4. Convert Gas Cost to Loan Token
+    const nativeTokenPrice = await getNativeTokenPriceInToken(network, provider, tokenA);
+    if (nativeTokenPrice === null) {
+        throw new Error("Could not determine the price of the native token to calculate net profit.");
+    }
+
+    // The price is Native-per-LoanToken. We need to convert gas (in Native) to the loan token value.
+    const estimatedGasCostInToken = (Number(formatUnits(estimatedGasCostNative, 18)) / nativeTokenPrice).toFixed(tokenADecimals);
+    const estimatedGasCostInTokenBigInt = parseUnits(estimatedGasCostInToken, tokenADecimals);
+
+    // 5. Calculate Net Profit
+    const netProfit = grossProfit - estimatedGasCostInTokenBigInt;
+
     return {
-        loanAmount: loanAmount,
-        finalAmount: formatUnits(finalAmountA, tokenADecimals),
-        grossProfit: grossProfitFormatted,
-        estimatedGas: estimatedGasCostFormatted,
-        // The frontend can calculate the final net profit based on current token prices.
+        isProfitable: netProfit > 0n,
+        estimatedProfit: formatUnits(netProfit, tokenADecimals),
+        grossProfit: formatUnits(grossProfit, tokenADecimals),
+        estimatedGasCost: formatUnits(estimatedGasCostNative, 18), // In native currency (e.g., ETH)
+        bestFee1: path1.fee.toString(),
+        bestFee2: path2.fee.toString(),
     };
 }
 
