@@ -1,4 +1,5 @@
-const { ethers, formatUnits, getAddress, AbiCoder } = require('ethers');
+require('dotenv').config({ path: '../.env' });
+const { ethers, formatUnits, getAddress, isAddress, AbiCoder } = require('ethers');
 const { NETWORKS, TOKENS, TOKEN_DECIMALS, ARBITRAGE_PAIRS, LOAN_TOKENS, LOAN_AMOUNTS, DEX_TYPES, BOT_CONFIG, DEX_ROUTERS } = require('./config');
 const { findBestPath, getDynamicGasPrice } = require('./services');
 const { AAVE_ARBITRAGE_V3_ABI } = require('./abi.js');
@@ -7,13 +8,23 @@ const IArbitrageABI = AAVE_ARBITRAGE_V3_ABI;
 
 // --- Globals ---
 const activeNetwork = 'base';
-const provider = new ethers.AlchemyProvider(activeNetwork, process.env.ALCHEMY_API_KEY);
 
-// --- Wallet Initialization ---
+// --- Environment and Configuration Validation ---
+if (!process.env.ALCHEMY_API_KEY) {
+    console.error('!!! FATAL: ALCHEMY_API_KEY is not set in the environment variables. The bot cannot connect to the blockchain. !!!');
+    process.exit(1);
+}
 if (!process.env.PRIVATE_KEY) {
     console.error('!!! FATAL: A private key was not provided in the environment variables. The bot cannot operate without a wallet. !!!');
     process.exit(1);
 }
+if (!BOT_CONFIG.ARBITRAGE_CONTRACT_ADDRESS || !isAddress(BOT_CONFIG.ARBITRAGE_CONTRACT_ADDRESS) || BOT_CONFIG.ARBITRAGE_CONTRACT_ADDRESS === '0xYourArbitrageContractAddress') {
+    console.error(`!!! FATAL: Invalid or placeholder ARBITRAGE_CONTRACT_ADDRESS in config: "${BOT_CONFIG.ARBITRAGE_CONTRACT_ADDRESS}". Please set it to your deployed contract address. !!!`);
+    process.exit(1);
+}
+
+// --- Provider & Wallet Initialization ---
+const provider = new ethers.AlchemyProvider(activeNetwork, process.env.ALCHEMY_API_KEY);
 
 let wallet;
 try {
@@ -21,7 +32,7 @@ try {
 } catch (error) {
     console.error('!!! CRITICAL ERROR: Failed to initialize the wallet. The provided private key is likely invalid. !!!');
     console.error('Error details:', error.message);
-    process.exit(1); 
+    process.exit(1);
 }
 
 console.log(`Successfully initialized wallet. Address: ${wallet.address}`);
@@ -37,7 +48,8 @@ function broadcast(type, data) {
 
 // --- Structured Logging ---
 function log(logLevel, event, message, payload = {}) {
-    console.log(`[${logLevel}] ${event}: ${message}`, payload);
+    const logMessage = `[${logLevel}] ${event}: ${message}`;
+    console.log(logMessage, payload);
     broadcast('bot-update', { logLevel, event, message, payload, timestamp: new Date().toISOString() });
 }
 
@@ -45,6 +57,7 @@ function log(logLevel, event, message, payload = {}) {
 async function findAndExecuteArbitrage(pair, loanAmount) {
     const [loanTokenAddress, targetTokenAddress] = pair;
     const loanTokenSymbol = Object.keys(LOAN_TOKENS).find(key => getAddress(TOKENS.base[key]) === getAddress(loanTokenAddress));
+    const targetTokenSymbol = Object.keys(TOKENS.base).find(key => getAddress(TOKENS.base[key]) === getAddress(targetTokenAddress));
     const allDexs = Object.keys(DEX_ROUTERS.base);
 
     const path1 = await findBestPath(loanTokenAddress, targetTokenAddress, loanAmount, provider, allDexs);
@@ -69,8 +82,9 @@ async function findAndExecuteArbitrage(pair, loanAmount) {
         estimatedProfit: formatUnits(netProfit, TOKEN_DECIMALS.base[loanTokenSymbol]),
     };
 
+    log('INFO', 'OPPORTUNITY_EVALUATION', `Evaluated opportunity with estimated profit of ${opportunityPayload.estimatedProfit} ${opportunityPayload.loanToken}`, opportunityPayload);
+
     if (netProfit <= minProfitThreshold) {
-        log('INFO', 'PROFIT_TOO_LOW', `Opportunity found but profit is below threshold. Est. Profit: ${opportunityPayload.estimatedProfit} ${opportunityPayload.loanToken}`, opportunityPayload);
         return { status: 'PROFIT_TOO_LOW' };
     }
 
@@ -145,15 +159,21 @@ async function run() {
 
     provider.on('block', async (blockNumber) => {
         log('INFO', 'BLOCK_SCAN', `Scanning block ${blockNumber} for opportunities.`);
+        let opportunitiesFound = false;
 
         try {
-            const searchPromises = ARBITRAGE_PAIRS.flatMap(pair => {
+            const searchResults = await Promise.all(ARBITRAGE_PAIRS.flatMap(pair => {
                 const [loanTokenAddress] = pair;
                 const loanTokenSymbol = Object.keys(LOAN_TOKENS).find(key => getAddress(LOAN_TOKENS[key]) === getAddress(loanTokenAddress));
                 const loanAmountsForToken = LOAN_AMOUNTS[loanTokenSymbol] || [];
                 return loanAmountsForToken.map(loanAmount => findAndExecuteArbitrage(pair, loanAmount));
-            });
-            await Promise.all(searchPromises);
+            }));
+
+            opportunitiesFound = searchResults.some(result => result && result.status !== 'NO_PATH' && result.status !== 'PROFIT_TOO_LOW');
+
+            if (!opportunitiesFound) {
+                log('INFO', 'NO_OPPORTUNITIES', `Scan complete. No profitable arbitrage opportunities found in block ${blockNumber}.`);
+            }
         } catch (error) {
             log('ERROR', 'SCAN_ERROR', `An unexpected error occurred during block scan: ${error.message}`, { blockNumber });
         }

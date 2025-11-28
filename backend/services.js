@@ -57,13 +57,18 @@ async function findV3BestPath(dex, tokenIn, tokenOut, amountIn, provider) {
     const quoterContract = new ethers.Contract(quoterAddress, IUniswapV3QuoterV2ABI, provider);
     const feeTiers = V3_FEE_TIERS[dex];
 
+    if (!feeTiers || feeTiers.length === 0) {
+        console.warn(`[V3 Path Finder] No fee tiers configured for DEX: ${dex}. Skipping.`);
+        return null;
+    }
+
     let bestPath = { amountOut: 0n, dex, path: null, tokens: [], type: 'V3', stable: false };
 
     // 1. Check direct path
     for (const fee of feeTiers) {
         try {
             const path = solidityPacked(['address', 'uint24', 'address'], [tokenIn, fee, tokenOut]);
-            const amountOut = await quoterContract.quoteExactInputSingle.staticCall(path, amountIn);
+            const { 0: amountOut } = await quoterContract.quoteExactInputSingle.staticCall({tokenIn, tokenOut, fee, amountIn, sqrtPriceLimitX96: 0});
 
             if (amountOut > bestPath.amountOut) {
                 bestPath = { ...bestPath, amountOut, path, tokens: [tokenIn, tokenOut], fee };
@@ -80,7 +85,7 @@ async function findV3BestPath(dex, tokenIn, tokenOut, amountIn, provider) {
                         ['address', 'uint24', 'address', 'uint24', 'address'],
                         [tokenIn, fee1, TOKENS.base.WETH, fee2, tokenOut]
                     );
-                    const amountOut = await quoterContract.quoteExactInput.staticCall(path, amountIn);
+                    const { 0: amountOut } = await quoterContract.quoteExactInput.staticCall(path, amountIn);
                     if (amountOut > bestPath.amountOut) {
                         bestPath = { ...bestPath, amountOut, path, tokens: [tokenIn, TOKENS.base.WETH, tokenOut], fee: [fee1, fee2] };
                     }
@@ -94,12 +99,15 @@ async function findV3BestPath(dex, tokenIn, tokenOut, amountIn, provider) {
 
 async function findV2BestPath(dex, tokenIn, tokenOut, amountIn, provider) {
     const dexConfig = DEX_ROUTERS.base[dex];
+    if (!dexConfig) {
+        console.warn(`[V2 Path Finder] No router config found for DEX: ${dex}. Skipping.`);
+        return null;
+    }
 
     let bestPath = { amountOut: 0n, dex, path: [], tokens: [], type: 'V2', stable: false };
 
     const factories = Object.entries(dexConfig.factories || {}).map(([type, address]) => ({ type, address, isStable: type === 'stable' }));
 
-    // Add a synthetic factory for DEXs without explicit factory types
     if (factories.length === 0 && dexConfig.factory) {
         factories.push({ type: 'volatile', address: dexConfig.factory, isStable: false });
     }
@@ -107,7 +115,6 @@ async function findV2BestPath(dex, tokenIn, tokenOut, amountIn, provider) {
     for (const factoryConfig of factories) {
         const factoryContract = new ethers.Contract(factoryConfig.address, IUniswapV2FactoryABI, provider);
 
-        // 1. Check direct path
         let currentBestAmount = bestPath.amountOut;
         try {
             const pairAddress = await factoryContract.getPair(tokenIn, tokenOut);
@@ -115,7 +122,7 @@ async function findV2BestPath(dex, tokenIn, tokenOut, amountIn, provider) {
                 const pairContract = new ethers.Contract(pairAddress, IUniswapV2PairABI, provider);
                 const reserves = await pairContract.getReserves();
                 const [reserveIn, reserveOut] = tokenIn.toLowerCase() < tokenOut.toLowerCase() ? [reserves[0], reserves[1]] : [reserves[1], reserves[0]];
-                const amountOut = getAmountOut(amountIn, reserveIn, reserveOut);
+                const amountOut = getAmountOut(amountIn, reserveIn, reserveOut, dexConfig.fee_numerator, dexConfig.fee_denominator);
 
                 if (amountOut > currentBestAmount) {
                     bestPath = { amountOut, dex, path: [tokenIn, tokenOut], tokens: [tokenIn, tokenOut], type: 'V2', stable: factoryConfig.isStable };
@@ -124,24 +131,21 @@ async function findV2BestPath(dex, tokenIn, tokenOut, amountIn, provider) {
             }
         } catch (e) { /* Path doesn't exist */ }
 
-        // 2. Check multi-hop path (via WETH)
         if (tokenIn !== TOKENS.base.WETH && tokenOut !== TOKENS.base.WETH) {
             try {
-                // In -> WETH
                 const pair1Address = await factoryContract.getPair(tokenIn, TOKENS.base.WETH);
                 if (pair1Address !== ethers.ZeroAddress) {
                     const pair1Contract = new ethers.Contract(pair1Address, IUniswapV2PairABI, provider);
                     const reserves1 = await pair1Contract.getReserves();
                     const [reserveIn1, reserveOut1] = tokenIn.toLowerCase() < TOKENS.base.WETH.toLowerCase() ? [reserves1[0], reserves1[1]] : [reserves1[1], reserves1[0]];
-                    const amountOut1 = getAmountOut(amountIn, reserveIn1, reserveOut1);
+                    const amountOut1 = getAmountOut(amountIn, reserveIn1, reserveOut1, dexConfig.fee_numerator, dexConfig.fee_denominator);
 
-                    // WETH -> Out
                     const pair2Address = await factoryContract.getPair(TOKENS.base.WETH, tokenOut);
                     if (pair2Address !== ethers.ZeroAddress) {
                         const pair2Contract = new ethers.Contract(pair2Address, IUniswapV2PairABI, provider);
                         const reserves2 = await pair2Contract.getReserves();
                         const [reserveIn2, reserveOut2] = TOKENS.base.WETH.toLowerCase() < tokenOut.toLowerCase() ? [reserves2[0], reserves2[1]] : [reserves2[1], reserves2[0]];
-                        const amountOut2 = getAmountOut(amountOut1, reserveIn2, reserveOut2);
+                        const amountOut2 = getAmountOut(amountOut1, reserveIn2, reserveOut2, dexConfig.fee_numerator, dexConfig.fee_denominator);
 
                         if (amountOut2 > currentBestAmount) {
                             bestPath = { amountOut: amountOut2, dex, path: [tokenIn, TOKENS.base.WETH, tokenOut], tokens: [tokenIn, TOKENS.base.WETH, tokenOut], type: 'V2', stable: factoryConfig.isStable };
@@ -155,96 +159,52 @@ async function findV2BestPath(dex, tokenIn, tokenOut, amountIn, provider) {
     return bestPath.amountOut > 0n ? bestPath : null;
 }
 
-function getAmountOut(amountIn, reserveIn, reserveOut) {
-    const amountInWithFee = amountIn * 997n; // Uniswap V2 fee is 0.3%
+function getAmountOut(amountIn, reserveIn, reserveOut, feeNumerator = 997n, feeDenominator = 1000n) {
+    if (reserveIn === 0n || reserveOut === 0n) return 0n;
+    const amountInWithFee = amountIn * feeNumerator;
     const numerator = amountInWithFee * reserveOut;
-    const denominator = (reserveIn * 1000n) + amountInWithFee;
+    const denominator = (reserveIn * feeDenominator) + amountInWithFee;
+    if (denominator === 0n) return 0n; 
     return numerator / denominator;
 }
 
 // --- Gas Price Logic ---
 
 async function getDynamicGasPrice(provider, strategy) {
-    const feeData = await provider.getFeeData();
-    const baseFee = feeData.gasPrice;
+    try {
+        const feeData = await provider.getFeeData();
+        const baseFee = feeData.gasPrice;
 
-    let multiplier;
-    switch (strategy) {
-        case 'slow':
-            multiplier = 1.1;
-            break;
-        case 'fast':
-            multiplier = 1.3;
-            break;
-        case 'urgent':
-            multiplier = 1.5;
-            break;
-        default:
-            multiplier = 1.2;
-    }
-
-    // Perform floating point multiplication and then convert to BigInt
-    const gasPriceInWei = parseFloat(baseFee.toString()) * multiplier;
-    return BigInt(Math.round(gasPriceInWei));
-}
-
-async function getOptimalLoanAmount(tokenA, tokenB, dex1, dex2, provider) {
-    let optimalLoanAmount = 0n;
-    let maxProfit = -Infinity;
-    const tokenADecimals = TOKEN_DECIMALS.base[getTokenSymbol(tokenA)] ?? 18;
-
-    // Define a set of loan amounts to test
-    const testAmounts = [
-        ethers.parseUnits('1', tokenADecimals),
-        ethers.parseUnits('10', tokenADecimals),
-        ethers.parseUnits('100', tokenADecimals),
-        ethers.parseUnits('500', tokenADecimals),
-        ethers.parseUnits('1000', tokenADecimals),
-        ethers.parseUnits('5000', tokenADecimals),
-    ];
-
-    console.log(`Finding optimal loan for ${getTokenSymbol(tokenA)} -> ${getTokenSymbol(tokenB)} on ${dex1} -> ${dex2}`);
-
-    for (const amount of testAmounts) {
-        try {
-            const path1 = await findBestPath(tokenA, tokenB, amount, provider, [dex1]);
-            if (!path1 || path1.amountOut === 0n) continue;
-
-            const path2 = await findBestPath(tokenB, tokenA, path1.amountOut, provider, [dex2]);
-            if (!path2 || path2.amountOut === 0n) continue;
-
-            const profit = path2.amountOut - amount;
-
-            if (profit > maxProfit) {
-                maxProfit = profit;
-                optimalLoanAmount = amount;
-            }
-        } catch (error) {
-            console.error(`Error calculating profit for amount ${ethers.formatUnits(amount, tokenADecimals)}:`, error);
+        if (!baseFee) {
+            console.warn('Could not fetch base fee, falling back to legacy gas price.');
+            const legacyGasPrice = await provider.getGasPrice();
+            return legacyGasPrice * 12n / 10n; // 1.2x multiplier as a default
         }
-    }
 
-    if (maxProfit > 0) {
-        console.log(`  > Optimal loan found: ${ethers.formatUnits(optimalLoanAmount, tokenADecimals)} ${getTokenSymbol(tokenA)} | Est. Profit: ${ethers.formatUnits(maxProfit, tokenADecimals)} ${getTokenSymbol(tokenA)}`);
-        return optimalLoanAmount;
-    } else {
-        console.log("  > No profitable opportunities found in test amounts.");
-        return 0n;
+        let multiplier;
+        switch (strategy) {
+            case 'slow':
+                multiplier = 1.1;
+                break;
+            case 'fast':
+                multiplier = 1.3;
+                break;
+            case 'urgent':
+                multiplier = 1.5;
+                break;
+            default: // 'medium'
+                multiplier = 1.2;
+        }
+
+        const gasPriceInWei = parseFloat(baseFee.toString()) * multiplier;
+        return BigInt(Math.round(gasPriceInWei));
+
+    } catch (error) {
+        console.error('Error getting dynamic gas price:', error);
+        // Fallback to a reasonable default if API fails
+        return ethers.parseUnits('5', 'gwei');
     }
 }
-
-function encodeV3Path(path, fees) {
-    if (!Array.isArray(fees)) {
-        return solidityPacked(['address', 'uint24', 'address'], [path[0], fees, path[1]]);
-    }
-
-    let encoded = solidityPacked(['address', 'uint24', 'address'], [path[0], fees[0], path[1]]);
-    for (let i = 1; i < fees.length; i++) {
-        encoded += solidityPacked(['uint24', 'address'], [fees[i], path[i+1]]).substring(2);
-    }
-    return encoded;
-}
-
 
 // --- Utility ---
 
@@ -261,8 +221,4 @@ function getTokenSymbol(address, network = 'base') {
 module.exports = {
     findBestPath,
     getDynamicGasPrice,
-    getOptimalLoanAmount,
-    encodeV3Path,
-    findV2BestPath,
-    findV3BestPath,
 };

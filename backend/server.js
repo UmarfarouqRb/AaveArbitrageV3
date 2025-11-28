@@ -34,16 +34,13 @@ app.use(express.json());
 const frontendDistPath = path.join(__dirname, '..', 'frontend', 'dist');
 app.use(express.static(frontendDistPath));
 
-
 // --- File Paths ---
 const MANUAL_TRADE_HISTORY_FILE = path.join(__dirname, 'manual_trade_history.json');
 const BOT_LOG_FILE = path.join(__dirname, 'bot.log');
 
 // --- Bot Process Management ---
 let botProcess = null;
-let isBotStopping = false; // To prevent restart on intentional stop
-let isRestarting = false;
-
+let isBotStopping = false;
 
 function broadcast(message) {
     if (!wss || !wss.clients) return;
@@ -56,13 +53,12 @@ function broadcast(message) {
 }
 
 function startBot() {
-    if (botProcess) { // Ensure no multiple instances are running
+    if (botProcess) {
         console.log('Bot process is already running.');
         return;
     }
     console.log('Starting the arbitrage bot process...');
     isBotStopping = false;
-    isRestarting = false;
 
     botProcess = fork(path.join(__dirname, 'bot.js'), [], {
         stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
@@ -78,17 +74,16 @@ function startBot() {
     });
 
     botProcess.on('exit', (code) => {
-        botProcess = null; // Clear the process handle
         if (isBotStopping) {
             console.log(`Bot process stopped intentionally.`);
+            broadcast({ type: 'status', data: { isOnline: false, message: 'Bot has been stopped.' } });
         } else {
             console.error(`Bot process terminated unexpectedly with code: ${code}.`);
-            if (!isRestarting) {
-                isRestarting = true;
-                console.log('Attempting to restart bot in 5 seconds...');
-                setTimeout(startBot, 5000);
-            }
+            broadcast({ type: 'status', data: { isOnline: false, message: `Bot crashed with code ${code}. Shutting down server.` } });
+            // If the bot crashes, the server can't function, so we shut it down.
+            cleanup(); 
         }
+        botProcess = null; 
     });
 
     botProcess.on('error', (err) => {
@@ -100,8 +95,10 @@ function stopBot() {
     if (botProcess) {
         console.log('Gracefully stopping the arbitrage bot...');
         isBotStopping = true;
-        botProcess.kill('SIGTERM'); // Send termination signal
+        botProcess.kill('SIGTERM');
+        return true;
     }
+    return false;
 }
 
 // --- API Endpoints ---
@@ -150,7 +147,7 @@ app.get('*', (req, res) => {
 });
 
 
-// --- WebSocket Server ---
+// --- WebSocket and Server Initialization ---
 const server = app.listen(port, host, () => {
     console.log(`Backend server is live at http://${host}:${port}`);
     startBot();
@@ -164,17 +161,29 @@ wss.on('connection', (ws) => {
 });
 
 // --- Graceful Shutdown Handling ---
+let isShuttingDown = false;
 const cleanup = () => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
     console.log('Initiating graceful shutdown...');
-    stopBot();
-    server.close(() => {
-        console.log('HTTP server closed.');
-        process.exit(0);
-    });
-    setTimeout(() => {
+
+    const wasBotRunning = stopBot();
+
+    // If the bot wasn't running, we might need to exit directly
+    // after closing the server.
+    const shutdownTimeout = setTimeout(() => {
         console.error('Could not close connections in time, forcing shutdown.');
         process.exit(1);
     }, 10000); // Force exit after 10s
+
+    server.close(() => {
+        console.log('HTTP server closed.');
+        clearTimeout(shutdownTimeout);
+        // If the bot wasn't running, the exit handler won't trigger process.exit
+        if (!wasBotRunning) {
+            process.exit(0);
+        }
+    });
 };
 
 process.on('SIGTERM', cleanup);

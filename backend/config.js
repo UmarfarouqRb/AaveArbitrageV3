@@ -42,12 +42,28 @@ const DEX_ROUTERS = {
         Aerodrome: {
             router: "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43",
             factory: "0x420DD3802Ce3B747844e3094BEfa374352b71D22",
+            fee_numerator: 997n,
+            fee_denominator: 1000n,
         },
         BaseSwap: {
             router: "0x327Df1E6de05895d2ab08525869213A502a938E2",
             factory: "0xAaA7A543e542028d84E67F9BBA84A6578052a045",
+            fee_numerator: 997n,
+            fee_denominator: 1000n,
         }
     },
+};
+
+const DEX_QUOTERS = {
+    base: {
+        UniswapV3: "0x3d4e44Eb1374240CE5F1B871ab261CD16335154A",
+        PancakeSwapV3: "0x8837aEC491006DAb45d9B07353B39535446415a2",
+    }
+};
+
+const V3_FEE_TIERS = {
+    UniswapV3: [100, 500, 3000, 10000],
+    PancakeSwapV3: [100, 500, 2500, 10000],
 };
 
 
@@ -80,7 +96,7 @@ const ARBITRAGE_PAIRS = [
 ];
 
 const BOT_CONFIG = {
-    ARBITRAGE_CONTRACT_ADDRESS: "0xYourArbitrageContractAddress", // Replace with your deployed contract address
+    ARBITRAGE_CONTRACT_ADDRESS: "0x7b2Af90c95A38016aB9e09926500A9A1ca915779", // Replace with your deployed contract address
     MIN_PROFIT_THRESHOLD_ETH: "0.001",
     GAS_PRICE_STRATEGY: "fast", // "fast", "standard", "slow"
     SLIPPAGE_TOLERANCE: 0.005, // 0.5%
@@ -93,6 +109,8 @@ module.exports = {
     TOKENS,
     TOKEN_DECIMALS,
     DEX_ROUTERS,
+    DEX_QUOTERS,
+    V3_FEE_TIERS,
     DEX_TYPES,
     LOAN_TOKENS,
     LOAN_AMOUNTS,
